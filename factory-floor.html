@@ -1,0 +1,1882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FR-MCR // FACTORY FLOOR</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #070a0d;
+    --surface: #0d1117;
+    --surface-hover: #151b23;
+    --border: #1c2630;
+    --text: #c9d1d9;
+    --text-muted: #6e7681;
+    --accent: #00c853;
+    --accent-dim: rgba(0,200,83,0.12);
+    --green: #00c853;
+    --green-dim: rgba(0,200,83,0.12);
+    --yellow: #f0b429;
+    --yellow-dim: rgba(240,180,41,0.12);
+    --red: #ff3b3b;
+    --red-dim: rgba(255,59,59,0.1);
+    --blue: #00d4ff;
+    --blue-dim: rgba(0,212,255,0.08);
+    --supply: #00c853;
+    --supply-dim: rgba(0,200,83,0.12);
+    --production: #ff3b3b;
+    --production-dim: rgba(255,59,59,0.1);
+    --quality: #f0b429;
+    --quality-dim: rgba(240,180,41,0.12);
+    --interop: #00d4ff;
+    --interop-dim: rgba(0,212,255,0.08);
+    --grey-metric: #3a4250;
+    --yellow-metric: #f0b429;
+    --green-metric: #00c853;
+    --blue-metric: #00d4ff;
+    --fr-green: #00c853;
+    --fr-green-glow: #00ff88;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+    padding: 0;
+    min-height: 100vh;
+  }
+
+  /* Scan-line overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* Classification header */
+  .classification-bar {
+    background: var(--surface);
+    border-bottom: 2px solid var(--fr-green);
+    padding: 8px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--fr-green);
+    position: relative;
+    z-index: 10;
+  }
+  .classification-bar .timestamp { color: var(--text-muted); letter-spacing: 1px; font-size: 10px; }
+  .ff-watermark {
+    position: fixed;
+    bottom: 12px;
+    right: 20px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(0,200,83,0.2);
+    text-transform: uppercase;
+    z-index: 10;
+  }
+  .ff-content { padding: 24px 32px; }
+
+  /* Header */
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+  .header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+  .header .subtitle { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+
+  /* View Toggle */
+  .view-toggle {
+    display: inline-flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .view-toggle button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .view-toggle button.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .view-toggle button:hover:not(.active) { color: var(--text); }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .controls button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .controls button:hover { background: var(--surface-hover); color: var(--text); }
+  .controls button.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .controls .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .legend-dot.glow { box-shadow: 0 0 6px 2px var(--blue-metric); }
+  .legend-sep { width: 1px; height: 14px; background: var(--border); margin: 0 4px; }
+
+  /* Assembly Progress Bar */
+  .assembly-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .assembly-bar .label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+  .assembly-track {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+  }
+  .assembly-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--supply), var(--production), var(--quality), var(--interop));
+    transition: width 0.5s;
+  }
+  .assembly-bar .pct { font-size: 12px; font-weight: 600; color: var(--text); min-width: 36px; text-align: right; }
+
+  /* Floorplan Container */
+  .floorplan {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3 / 2.4;
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background:
+      linear-gradient(rgba(0,200,83,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,200,83,0.03) 1px, transparent 1px),
+      var(--bg);
+    background-size: 40px 40px;
+  }
+
+  /* Zone Backgrounds */
+  .zone-bg {
+    position: absolute;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .zone-bg .zone-watermark {
+    font-size: clamp(14px, 2vw, 28px);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    opacity: 0.04;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  /* Interop Zone special background */
+  .zone-bg.interop-zone {
+    background: linear-gradient(180deg, rgba(0,212,255,0.04), rgba(0,212,255,0.01)) !important;
+    border: 1px solid rgba(0,212,255,0.08) !important;
+  }
+
+  /* AutoPlan Overlay */
+  .autoplan-overlay {
+    position: absolute;
+    border: 2px dashed rgba(0,200,83,0.4);
+    border-radius: 14px;
+    background: rgba(0,200,83,0.03);
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 3;
+    transition: all 0.2s;
+  }
+  .autoplan-overlay:hover {
+    border-color: rgba(0,200,83,0.7);
+    background: rgba(0,200,83,0.06);
+    box-shadow: 0 0 20px rgba(0,200,83,0.1);
+  }
+  .autoplan-label {
+    position: absolute;
+    top: -12px;
+    left: 16px;
+    background: var(--bg);
+    padding: 2px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--green);
+    border: 1px solid rgba(0,200,83,0.3);
+    border-radius: 4px;
+  }
+  .autoplan-capabilities {
+    position: absolute;
+    bottom: 4px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .autoplan-chip {
+    font-size: 9px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(0,200,83,0.08);
+    color: var(--green);
+    border: 1px solid rgba(0,200,83,0.2);
+    white-space: nowrap;
+  }
+
+  /* Data Instrumentation Indicator */
+  .data-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .data-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .data-dot.instrumented { background: var(--green); box-shadow: 0 0 4px rgba(0,200,83,0.4); }
+  .data-dot.partial { background: var(--yellow); }
+  .data-dot.not-instrumented { background: var(--grey-metric); }
+
+  /* Interop Connectors */
+  .interop-connector {
+    position: absolute;
+    width: 1px;
+    border-left: 2px dashed rgba(0,212,255,0.15);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* SVG Flow Layer */
+  .flow-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .flow-path {
+    fill: none;
+    stroke-width: 2;
+    stroke-dasharray: 8 4;
+    animation: flowDash 1.5s linear infinite;
+  }
+  .flow-path.zone-cross {
+    stroke-width: 2.5;
+    stroke-dasharray: 10 5;
+    filter: drop-shadow(0 0 3px currentColor);
+  }
+  .flow-arrow {
+    animation: flowDash 1.5s linear infinite;
+  }
+  @keyframes flowDash {
+    to { stroke-dashoffset: -24; }
+  }
+
+  /* Dock Markers */
+  .dock-marker {
+    position: absolute;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    opacity: 0.6;
+    z-index: 2;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Station Card — optimized for 34-40" mission control */
+  .station-card {
+    position: absolute;
+    width: 15.5%;
+    min-width: 180px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 2;
+    border-top: 3px solid var(--border);
+  }
+  .station-card:hover {
+    border-color: var(--text-muted);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  }
+  .station-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .station-card.zone-supply { border-top-color: var(--supply); }
+  .station-card.zone-production { border-top-color: var(--production); }
+  .station-card.zone-quality { border-top-color: var(--quality); }
+  .station-card.zone-interop { border-top-color: var(--interop); }
+
+  /* Interop stations slightly narrower to fit 6 across */
+  .station-card.zone-interop {
+    width: 14%;
+    min-width: 160px;
+  }
+
+  .station-name {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+
+  /* Software View elements */
+  .sw-maturity { margin-bottom: 6px; }
+  .maturity-bar-track {
+    height: 5px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 3px;
+  }
+  .maturity-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s;
+  }
+  .maturity-label { font-size: 11px; color: var(--text-muted); }
+
+  .sw-stats {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .sw-stat {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .sw-stat .num { font-weight: 700; color: var(--text); font-size: 14px; }
+
+  .heat-indicator {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .heat-hot { background: var(--red-dim); color: var(--red); }
+  .heat-warm { background: var(--yellow-dim); color: var(--yellow); }
+  .heat-cool { background: var(--green-dim); color: var(--green); }
+
+  /* Metrics View elements */
+  .metrics-view { display: none; }
+  .station-card.metrics-mode .software-view { display: none; }
+  .station-card.metrics-mode .metrics-view { display: block; }
+
+  .kpi-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    font-size: 11px;
+  }
+  .kpi-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .kpi-dot.grey { background: var(--grey-metric); }
+  .kpi-dot.yellow { background: var(--yellow-metric); }
+  .kpi-dot.green { background: var(--green-metric); }
+  .kpi-dot.blue { background: var(--blue-metric); box-shadow: 0 0 6px 2px rgba(59,130,246,0.4); }
+  .kpi-name { color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kpi-trend { font-size: 10px; }
+  .kpi-trend.up { color: var(--green); }
+  .kpi-trend.down { color: var(--red); }
+  .kpi-trend.flat { color: var(--text-muted); }
+
+  .metric-gap-summary {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+  .metric-gap-summary .gap-count { font-weight: 700; color: var(--yellow); }
+
+  /* Pillar strips */
+  .pillar-strip {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    justify-content: center;
+  }
+  .pillar-badge {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .pillar-badge:hover { border-color: var(--text-muted); }
+  .pillar-badge.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .pillar-badge .icon { margin-right: 4px; }
+
+  /* Detail Panel */
+  .detail-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 460px;
+    height: 100vh;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 100;
+    overflow-y: auto;
+    box-shadow: -8px 0 30px rgba(0,0,0,0.5);
+    padding: 24px;
+  }
+  .detail-overlay.open { display: block; }
+
+  .detail-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 20px;
+    cursor: pointer;
+  }
+  .detail-close:hover { color: var(--text); }
+
+  .detail-header {
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-header h2 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .detail-header .lane-tag {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .detail-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+  .detail-tab {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .detail-tab:hover { color: var(--text); }
+  .detail-tab.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  .detail-section { margin-bottom: 16px; }
+  .detail-section h3 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .detail-maturity-bar {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 4px;
+  }
+  .detail-maturity-fill {
+    height: 100%;
+    border-radius: 4px;
+  }
+
+  .roadmap-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    margin: 2px;
+  }
+  .roadmap-chip .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  /* Project item in detail panel */
+  .project-item {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 4px;
+    background: var(--bg);
+    font-size: 11px;
+  }
+  .project-item .proj-name { font-weight: 600; font-size: 12px; margin-bottom: 2px; }
+  .project-item .proj-meta { color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap; }
+  .project-item .proj-status {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  /* KPI detail card */
+  .kpi-detail-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+  }
+  .kpi-detail-card .kpi-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .kpi-detail-card .kpi-title { font-size: 12px; font-weight: 600; }
+  .kpi-detail-card .kpi-maturity-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 4px;
+  }
+  .kpi-detail-card .kpi-value { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+  .kpi-detail-card .kpi-gap { font-size: 10px; color: var(--yellow); font-style: italic; }
+
+  .badge-grey { background: rgba(85,85,85,0.3); color: #999; }
+  .badge-yellow { background: var(--yellow-dim); color: var(--yellow); }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); }
+
+  /* Heat overlay */
+  .station-card.heat-overlay-hot { box-shadow: inset 0 0 0 2px var(--red), 0 0 12px rgba(239,68,68,0.2); }
+  .station-card.heat-overlay-warm { box-shadow: inset 0 0 0 2px var(--yellow), 0 0 8px rgba(234,179,8,0.15); }
+  .station-card.heat-overlay-cool { box-shadow: inset 0 0 0 1px var(--green); }
+
+  /* Tooltip */
+  .tooltip {
+    display: none;
+    position: fixed;
+    background: #1e2030;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    max-width: 280px;
+    z-index: 200;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .tooltip.visible { display: block; }
+  .tooltip .tt-title { font-weight: 600; margin-bottom: 4px; }
+  .tooltip .tt-line { color: var(--text-muted); font-size: 11px; line-height: 1.4; }
+
+  /* AutoPlan Detail Panel */
+  .autoplan-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .autoplan-detail-header h2 { font-size: 18px; font-weight: 700; color: var(--green); }
+  .autoplan-status-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(0,200,83,0.12);
+    color: var(--green);
+  }
+  .autoplan-metric-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+  }
+  .autoplan-metric-card .metric-name { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .autoplan-metric-card .metric-values { font-size: 11px; color: var(--text-muted); }
+
+  /* Responsive */
+  @media (max-width: 1200px) {
+    .station-card { min-width: 140px; }
+    .station-card.zone-interop { min-width: 130px; }
+    .detail-overlay { width: 380px; }
+  }
+  @media (max-width: 768px) {
+    .station-card { min-width: 100px; padding: 10px; font-size: 10px; min-height: 44px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="classification-bar">
+  <span>UNCLASSIFIED // FIRST RESONANCE // ION FACTORY OS</span>
+  <span class="timestamp" id="utc-clock-ff"></span>
+</div>
+<div class="ff-watermark">FR-MCR // FACTORY FLOOR</div>
+
+<div class="ff-content">
+<div class="header">
+  <div>
+    <h1 style="color:var(--fr-green);letter-spacing:2px;text-transform:uppercase;font-size:22px;">ION Factory Floor</h1>
+    <div class="subtitle">Software Roadmap & Factory Metrics — <span id="lastUpdated">March 2026</span></div>
+  </div>
+  <div class="header-right">
+    <div class="view-toggle">
+      <button class="active" onclick="setView('software')">Software View</button>
+      <button onclick="setView('metrics')">Metrics View</button>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button id="heatBtn" onclick="toggleHeat()">Heat Map</button>
+  <div class="sep"></div>
+  <button class="pillar-btn" data-pillar="joy" onclick="togglePillar('joy')">Joy</button>
+  <button class="pillar-btn" data-pillar="goals" onclick="togglePillar('goals')">Goals & Compliance</button>
+  <button class="pillar-btn" data-pillar="context" onclick="togglePillar('context')">Context & Connectivity</button>
+</div>
+
+<div class="legend" id="softwareLegend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Shipped / Mature</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>In Progress</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Early / Gaps</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>Planned</div>
+  <div class="legend-sep"></div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--supply)"></div>Supply Chain</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--production)"></div>Production</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--quality)"></div>Quality</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--interop)"></div>Interoperability</div>
+  <div class="legend-sep"></div>
+  <div class="legend-item"><div class="data-dot instrumented"></div>Data Instrumented</div>
+  <div class="legend-item"><div class="data-dot partial"></div>Partial Data</div>
+  <div class="legend-item"><div class="data-dot not-instrumented"></div>Not Instrumented</div>
+</div>
+<div class="legend" id="metricsLegend" style="display:none;">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--grey-metric)"></div>Not Tracked</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--yellow-metric)"></div>Raw Data Only</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--green-metric)"></div>Actively Tracked</div>
+  <div class="legend-item"><div class="legend-dot glow" style="background:var(--blue-metric)"></div>AI-Augmented</div>
+</div>
+
+<!-- Assembly Progress Bar -->
+<div class="assembly-bar">
+  <div class="label">Product Journey</div>
+  <div class="assembly-track"><div class="assembly-fill" id="assemblyFill" style="width:52%"></div></div>
+  <div class="pct" id="assemblyPct">52%</div>
+</div>
+
+<!-- Factory Floor -->
+<div class="floorplan" id="floorplan"></div>
+
+<!-- Pillar Strips -->
+<div class="pillar-strip">
+  <div class="pillar-badge" data-pillar="joy">Joy — Workers Want to Use ION</div>
+  <div class="pillar-badge" data-pillar="goals">Goals & Compliance — Trusted Outcomes</div>
+  <div class="pillar-badge" data-pillar="context">Context & Connectivity — Factory Nervous System</div>
+</div>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip">
+  <div class="tt-title" id="ttTitle"></div>
+  <div class="tt-line" id="ttBody"></div>
+</div>
+
+<!-- Detail Panel -->
+<div class="detail-overlay" id="detailPanel">
+  <button class="detail-close" onclick="closeDetail()">&times;</button>
+  <div id="detailContent"></div>
+</div>
+
+<script>
+// ── DATA MODEL ──────────────────────────────────────────────────────────────
+
+// AutoPlan overlay data — cross-cutting intelligence layer over Supply Chain
+const AUTOPLAN_OVERLAY = {
+  label: 'AUTOPLAN — Intelligence Layer',
+  status: 'maintenance',
+  capabilities: ['Demand Planning', 'Clear-to-Build %', 'Schedule Optimization'],
+  metrics: [
+    { name: 'Schedule Attainment %', current: '~78%', goal: '90%', trend: 'up' },
+    { name: 'Clear-to-Build %', current: '82%', goal: '85%', trend: 'up' },
+    { name: 'Demand Forecast Accuracy', current: '—', goal: '>80%', trend: 'flat', gap: 'Needs demand signal integration' },
+    { name: 'Planning Horizon', current: '~60 days', goal: '90 days', trend: 'flat' }
+  ],
+  roadmapItems: [
+    { name: 'Autoplan Infrastructure & Support', status: 'maintenance', ecd: 'Ongoing', notes: 'Maintenance mode — no new feature investment' },
+    { name: 'Janitor Agent', status: 'planned', ecd: 'Q2', notes: 'BUILD READY — automated data cleanup' }
+  ]
+};
+
+const STATIONS = {
+  supply: {
+    label: 'Supply Chain',
+    color: '#93c47d',
+    colorDim: 'rgba(147,196,125,0.12)',
+    stations: [
+      {
+        id: 'purchasing', name: 'Purchasing',
+        maturity: 55, maturityLevel: 'Growing',
+        pillars: ['goals','context'],
+        heat: 'warm', dataInstrumentation: 'partial',
+        projects: [
+          { name: 'Purchasing & Receiving Audit', source: 'linear', team: 'Supply Chain', ecd: 'Mar 31', status: 'in-progress', externalRoadmap: null },
+          { name: 'Build/Buy Integrations — SC', source: 'linear', team: 'Supply Chain', ecd: 'Q2', status: 'planning', externalRoadmap: null }
+        ],
+        roadmapItems: [
+          { name: 'Purchasing & Receiving Audit', status: 'in-progress', ecd: 'Mar 31' }
+        ],
+        customers: ['Arc Boats','Hadrian','Impulse Space'],
+        metrics: [
+          { name: 'On-Time PO Delivery %', maturity: 'yellow', trend: 'flat', goal: '95%', current: '—' },
+          { name: 'PO Cycle Time', maturity: 'yellow', trend: 'flat', goal: '<3 days', current: '—' },
+          { name: 'Supplier Lead Time', maturity: 'yellow', trend: 'flat', goal: 'Tracked', current: '—' },
+          { name: 'Purchase Price Variance', maturity: 'grey', trend: 'flat', goal: '<5%', current: '—', gap: 'Needs financial data integration (ION for Finance)' }
+        ]
+      },
+      {
+        id: 'receiving', name: 'Receiving',
+        maturity: 50, maturityLevel: 'Growing',
+        pillars: ['goals'],
+        heat: 'cool', dataInstrumentation: 'partial',
+        projects: [
+          { name: 'Purchasing & Receiving Audit', source: 'linear', team: 'Supply Chain', ecd: 'Mar 31', status: 'in-progress', externalRoadmap: null }
+        ],
+        roadmapItems: [],
+        customers: ['General Matter','Hermeus'],
+        metrics: [
+          { name: 'Dock-to-Stock Time', maturity: 'grey', trend: 'flat', goal: '<4 hrs', current: '—', gap: 'Timestamp tracking on receive + stock events' },
+          { name: 'Receiving Accuracy %', maturity: 'yellow', trend: 'up', goal: '99%', current: '~97%' },
+          { name: 'Receiving Throughput', maturity: 'yellow', trend: 'flat', goal: '—', current: '—' },
+          { name: 'Inspection Pass Rate', maturity: 'green', trend: 'up', goal: '>95%', current: '94%' }
+        ]
+      },
+      {
+        id: 'parts-bom', name: 'Parts & BOM',
+        maturity: 80, maturityLevel: 'Mature',
+        pillars: ['context','goals'],
+        heat: 'cool', dataInstrumentation: 'instrumented',
+        projects: [
+          { name: 'Deeper aBOM Insights', source: 'linear', team: 'Production', ecd: 'Mar 31', status: 'not-started', externalRoadmap: 'Deeper aBOM Insights' }
+        ],
+        roadmapItems: [
+          { name: 'Deeper aBOM Insights', status: 'in-progress', ecd: 'Mar 31' }
+        ],
+        customers: ['Hadrian','Impulse Space','Relativity Space'],
+        metrics: [
+          { name: 'BOM Accuracy %', maturity: 'green', trend: 'up', goal: '99.5%', current: '98.2%' },
+          { name: 'Part Revision Churn', maturity: 'green', trend: 'down', goal: '<10/mo', current: '8/mo' },
+          { name: 'Substitute Usage Rate', maturity: 'yellow', trend: 'flat', goal: 'Tracked', current: '—' },
+          { name: 'Eng Change Cycle Time', maturity: 'yellow', trend: 'flat', goal: '<5 days', current: '—' }
+        ]
+      },
+      {
+        id: 'inventory', name: 'Inventory',
+        maturity: 65, maturityLevel: 'Growing',
+        pillars: ['goals','context'],
+        heat: 'warm', dataInstrumentation: 'partial',
+        projects: [
+          { name: 'Inventory Merge (FOR-952)', source: 'linear', team: 'Supply Chain', ecd: 'Q1', status: 'in-progress', externalRoadmap: null },
+          { name: 'Discrete Batching', source: 'linear', team: 'Supply Chain', ecd: 'TBD', status: 'planning', externalRoadmap: 'Discrete Batching' }
+        ],
+        roadmapItems: [
+          { name: 'Inventory Merge (FOR-952)', status: 'in-progress', ecd: 'Q1' },
+          { name: 'Discrete Batching', status: 'planned', ecd: 'TBD' }
+        ],
+        customers: ['Arc Boats','General Matter','Hermeus','Impulse Space'],
+        metrics: [
+          { name: 'Inventory Turns', maturity: 'grey', trend: 'flat', goal: '6x/yr', current: '—', gap: 'Needs COGS + avg inventory value calc' },
+          { name: 'Inventory Accuracy %', maturity: 'yellow', trend: 'up', goal: '98%', current: '~95%' },
+          { name: 'WIP Value', maturity: 'yellow', trend: 'flat', goal: 'Tracked', current: '—' },
+          { name: 'Scrap Rate ($)', maturity: 'grey', trend: 'flat', goal: '<2%', current: '—', gap: 'Needs scrap cost tracking per lot' },
+          { name: 'Days of Supply', maturity: 'grey', trend: 'flat', goal: 'Tracked', current: '—', gap: 'Needs consumption rate model' }
+        ]
+      },
+      {
+        id: 'kitting', name: 'Kitting',
+        maturity: 70, maturityLevel: 'Strong',
+        pillars: ['joy','goals'],
+        heat: 'cool', dataInstrumentation: 'instrumented',
+        projects: [
+          { name: 'Scanning Sessions & Undo', source: 'linear', team: 'Supply Chain', ecd: 'Mar 13', status: 'not-started', externalRoadmap: 'Scanning Sessions & Undo' }
+        ],
+        roadmapItems: [
+          { name: 'Scanning Sessions & Undo', status: 'planned', ecd: 'Mar 13' }
+        ],
+        customers: ['Arc Boats','Hermeus'],
+        metrics: [
+          { name: 'Kit Fill Rate %', maturity: 'green', trend: 'up', goal: '98%', current: '96%' },
+          { name: 'Kit Cycle Time', maturity: 'yellow', trend: 'flat', goal: '<2 hrs', current: '—' },
+          { name: 'Stockout Rate', maturity: 'yellow', trend: 'down', goal: '<3%', current: '~5%' },
+          { name: 'Kanban Replenishment', maturity: 'grey', trend: 'flat', goal: '<24 hrs', current: '—', gap: 'Needs kanban trigger automation' }
+        ]
+      }
+    ]
+  },
+  production: {
+    label: 'Production',
+    color: '#e06666',
+    colorDim: 'rgba(224,102,102,0.12)',
+    stations: [
+      {
+        id: 'procedures', name: 'Procedure Building',
+        maturity: 75, maturityLevel: 'Strong',
+        pillars: ['joy','context'],
+        heat: 'cool', dataInstrumentation: 'instrumented',
+        projects: [
+          { name: 'Procedures Diff Closure', source: 'linear', team: 'Production', ecd: 'Q1', status: 'in-progress', externalRoadmap: null }
+        ],
+        roadmapItems: [
+          { name: 'Procedures Diff Closure', status: 'in-progress', ecd: 'Q1' }
+        ],
+        customers: ['Hadrian','Impulse Space','Arc Boats'],
+        metrics: [
+          { name: 'Procedure Coverage %', maturity: 'green', trend: 'up', goal: '100%', current: '87%' },
+          { name: 'Revision Cycle Time', maturity: 'yellow', trend: 'flat', goal: '<3 days', current: '—' },
+          { name: 'Procedure Reuse Rate', maturity: 'yellow', trend: 'up', goal: '>30%', current: '~25%' },
+          { name: 'Red-line Frequency', maturity: 'grey', trend: 'flat', goal: 'Tracked', current: '—', gap: 'Needs red-line event capture in run UX' }
+        ]
+      },
+      {
+        id: 'run-execution', name: 'Run Execution',
+        maturity: 70, maturityLevel: 'Strong',
+        pillars: ['joy','goals','context'],
+        heat: 'hot', dataInstrumentation: 'partial',
+        projects: [
+          { name: 'Run Execution GA', source: 'linear', team: 'Production', ecd: 'Mar 13', status: 'in-progress', externalRoadmap: 'Improved Run & Workcenter Flow' },
+          { name: 'Intent Management', source: 'linear', team: 'Production', ecd: 'TBD', status: 'overdue', externalRoadmap: 'Intent Management' },
+          { name: 'Mobile + Build Log v1', source: 'linear', team: 'Production', ecd: 'Q2', status: 'planning', externalRoadmap: 'Mobile App v1' }
+        ],
+        roadmapItems: [
+          { name: 'Runs Feature Completion', status: 'in-progress', ecd: 'Mar 13' },
+          { name: 'Intent Management', status: 'overdue', ecd: 'Feb 18' },
+          { name: 'Build Log (Phase 1)', status: 'planned', ecd: 'Q2' }
+        ],
+        customers: ['Arc Boats','Hadrian','Impulse Space','Hermeus','General Matter','Relativity Space'],
+        metrics: [
+          { name: 'OEE', maturity: 'grey', trend: 'flat', goal: '>75%', current: '—', gap: 'Needs availability + performance + quality integration' },
+          { name: 'First Pass Yield', maturity: 'yellow', trend: 'up', goal: '>95%', current: '~91%' },
+          { name: 'Cycle Time', maturity: 'yellow', trend: 'down', goal: 'By product', current: 'Tracked' },
+          { name: 'Throughput (units/shift)', maturity: 'yellow', trend: 'up', goal: 'By line', current: 'Tracked' },
+          { name: 'Workcenter Utilization', maturity: 'grey', trend: 'flat', goal: '>80%', current: '—', gap: 'Needs workcenter time allocation model' },
+          { name: 'Changeover Time', maturity: 'grey', trend: 'flat', goal: 'SMED target', current: '—', gap: 'Needs run-transition timestamp capture' }
+        ]
+      },
+      {
+        id: 'barcode', name: 'Barcode & Scanning',
+        maturity: 55, maturityLevel: 'Growing',
+        pillars: ['joy'],
+        heat: 'warm', dataInstrumentation: 'partial',
+        projects: [
+          { name: 'Scanning Sessions & Undo', source: 'linear', team: 'Production', ecd: 'Mar 13', status: 'not-started', externalRoadmap: 'Scanning Sessions & Undo' }
+        ],
+        roadmapItems: [
+          { name: 'Scanning Sessions & Undo', status: 'planned', ecd: 'Mar 13' }
+        ],
+        customers: ['Hadrian','Impulse Space'],
+        metrics: [
+          { name: 'Scan Accuracy %', maturity: 'yellow', trend: 'up', goal: '99.5%', current: '~98%' },
+          { name: 'Scan-to-Complete Time', maturity: 'grey', trend: 'flat', goal: '<5s', current: '—', gap: 'Needs session-level timing' },
+          { name: 'Label Error Rate', maturity: 'grey', trend: 'flat', goal: '<0.5%', current: '—', gap: 'Needs label mismatch tracking' }
+        ]
+      },
+      {
+        id: 'tools-locations', name: 'Tools & Locations',
+        maturity: 45, maturityLevel: 'Early',
+        pillars: ['goals'],
+        heat: 'cool', dataInstrumentation: 'partial',
+        projects: [],
+        roadmapItems: [],
+        customers: ['Hadrian','General Matter'],
+        metrics: [
+          { name: 'Tool Utilization %', maturity: 'grey', trend: 'flat', goal: '>70%', current: '—', gap: 'Needs tool check-in/out tracking' },
+          { name: 'Calibration Compliance', maturity: 'yellow', trend: 'flat', goal: '100%', current: '~90%' },
+          { name: 'Location Accuracy', maturity: 'yellow', trend: 'up', goal: '99%', current: '~95%' }
+        ]
+      }
+    ]
+  },
+  quality: {
+    label: 'Quality',
+    color: '#f6b26b',
+    colorDim: 'rgba(246,178,107,0.12)',
+    stations: [
+      {
+        id: 'issue-capture', name: 'Issue Capture',
+        maturity: 55, maturityLevel: 'Growing',
+        pillars: ['goals','context'],
+        heat: 'hot', dataInstrumentation: 'partial',
+        projects: [
+          { name: 'Issues v2 GA', source: 'linear', team: 'Quality', ecd: 'Overdue', status: 'overdue', externalRoadmap: 'Streamlined Issue Capture' },
+          { name: 'ION Change Management', source: 'linear', team: 'Quality', ecd: 'Q2', status: 'not-started', externalRoadmap: 'ION Change Management' }
+        ],
+        roadmapItems: [
+          { name: 'Issues v2 GA', status: 'overdue', ecd: 'Jan 31' },
+          { name: 'ION Change Management', status: 'planned', ecd: 'Q2' }
+        ],
+        customers: ['Hadrian','Impulse Space','Arc Boats','Hermeus','General Matter'],
+        metrics: [
+          { name: 'Issue Detection Rate', maturity: 'yellow', trend: 'up', goal: '>90%', current: '—' },
+          { name: 'MTTD (Mean Time to Detect)', maturity: 'grey', trend: 'flat', goal: '<2 hrs', current: '—', gap: 'Needs issue-creation-to-event timestamp pairing' },
+          { name: 'DPHU (Defects per 100 Units)', maturity: 'grey', trend: 'flat', goal: '<5', current: '—', gap: 'Needs unit count + issue linkage' },
+          { name: 'Escape Rate', maturity: 'grey', trend: 'flat', goal: '<1%', current: '—', gap: 'Needs post-ship issue flagging workflow' }
+        ]
+      },
+      {
+        id: 'disposition', name: 'Disposition',
+        maturity: 45, maturityLevel: 'Early',
+        pillars: ['goals'],
+        heat: 'warm', dataInstrumentation: 'not-instrumented',
+        projects: [],
+        roadmapItems: [],
+        customers: ['Hadrian','Impulse Space'],
+        metrics: [
+          { name: 'Mean Time to Disposition', maturity: 'yellow', trend: 'flat', goal: '<24 hrs', current: '—' },
+          { name: 'Disposition Accuracy %', maturity: 'grey', trend: 'flat', goal: '>95%', current: '—', gap: 'Needs disposition outcome validation loop' },
+          { name: 'Root Cause ID Rate', maturity: 'grey', trend: 'flat', goal: '>80%', current: '—', gap: 'Needs structured root cause taxonomy' }
+        ]
+      },
+      {
+        id: 'capa', name: 'CAPA',
+        maturity: 15, maturityLevel: 'Aspirational',
+        pillars: ['goals','context'],
+        heat: 'warm', dataInstrumentation: 'not-instrumented',
+        projects: [
+          { name: 'Found On / Caused By / Fixed By Parts', source: 'linear', team: 'Quality', ecd: 'Apr 28', status: 'not-started', externalRoadmap: 'Found on/Caused by/Fixed by Parts' },
+          { name: 'CAPA Root Cause Intelligence', source: 'linear', team: 'Quality', ecd: 'Q2', status: 'planning', externalRoadmap: null }
+        ],
+        roadmapItems: [
+          { name: 'Found On / Caused By / Fixed By Parts', status: 'planned', ecd: 'Apr 28' },
+          { name: 'CAPA Root Cause Intelligence', status: 'planned', ecd: 'Q2' }
+        ],
+        customers: ['Hermeus','General Matter'],
+        metrics: [
+          { name: 'CAPA Closure Rate', maturity: 'grey', trend: 'flat', goal: '>90%', current: '—', gap: 'CAPA module not yet built' },
+          { name: 'CAPA Cycle Time', maturity: 'grey', trend: 'flat', goal: '<30 days', current: '—', gap: 'CAPA module not yet built' },
+          { name: 'Recurrence Rate', maturity: 'grey', trend: 'flat', goal: '<5%', current: '—', gap: 'Needs issue-to-CAPA linkage' },
+          { name: 'Corrective Action Effectiveness', maturity: 'grey', trend: 'flat', goal: '>85%', current: '—', gap: 'CAPA module not yet built' }
+        ]
+      },
+      {
+        id: 'trace-compliance', name: 'Trace & Compliance',
+        maturity: 65, maturityLevel: 'Growing',
+        pillars: ['goals','context'],
+        heat: 'warm', dataInstrumentation: 'instrumented',
+        projects: [
+          { name: 'Compliance Template Set', source: 'linear', team: 'Quality', ecd: 'Q1', status: 'in-progress', externalRoadmap: null },
+          { name: 'Value Framework Spec', source: 'linear', team: 'Manufacturing Success', ecd: 'Mar 31', status: 'in-progress', externalRoadmap: null }
+        ],
+        roadmapItems: [
+          { name: 'Compliance Template Set', status: 'in-progress', ecd: 'Q1' },
+          { name: 'Value Framework Spec', status: 'in-progress', ecd: 'Mar 31' }
+        ],
+        customers: ['Hadrian','General Matter','Hermeus','Impulse Space','Relativity Space'],
+        metrics: [
+          { name: 'Traceability Coverage %', maturity: 'green', trend: 'up', goal: '100%', current: '92%' },
+          { name: 'Audit Finding Rate', maturity: 'yellow', trend: 'down', goal: '<3/audit', current: '~4/audit' },
+          { name: 'Non-Conformance Rate', maturity: 'yellow', trend: 'down', goal: '<2%', current: '~3%' },
+          { name: 'Export Control Compliance', maturity: 'grey', trend: 'flat', goal: '100%', current: '—', gap: 'ITAR/CMMC module roadmapped for on-prem' }
+        ]
+      }
+    ]
+  },
+  interop: {
+    label: 'Interoperability',
+    color: '#00d4ff',
+    colorDim: 'rgba(0,212,255,0.08)',
+    stations: [
+      {
+        id: 'ion-actions', name: 'ION Actions',
+        maturity: 60, maturityLevel: 'Growing',
+        pillars: ['context','joy'],
+        heat: 'warm', dataInstrumentation: 'partial',
+        projects: [
+          { name: 'ION Actions Non-Blocking', source: 'linear', team: 'Platform', ecd: 'Overdue', status: 'overdue', externalRoadmap: 'ION Actions Non-Blocking' }
+        ],
+        roadmapItems: [
+          { name: 'ION Actions Non-Blocking', status: 'overdue', ecd: 'Feb 28' }
+        ],
+        customers: ['Hadrian','Impulse Space','Arc Boats','Hermeus'],
+        metrics: [
+          { name: 'Automation Trigger Rate', maturity: 'green', trend: 'up', goal: '>100/day', current: '~85/day' },
+          { name: 'Workflow Success %', maturity: 'green', trend: 'up', goal: '>98%', current: '97%' },
+          { name: 'Manual Override Rate', maturity: 'yellow', trend: 'down', goal: '<5%', current: '~8%' },
+          { name: 'Time Saved by Automation', maturity: 'grey', trend: 'flat', goal: 'Tracked', current: '—', gap: 'Needs baseline manual-time comparison model' }
+        ]
+      },
+      {
+        id: 'graphql-api', name: 'GraphQL API',
+        maturity: 85, maturityLevel: 'Mature',
+        pillars: ['context'],
+        heat: 'cool', dataInstrumentation: 'instrumented',
+        projects: [
+          { name: 'Reliable Imports', source: 'linear', team: 'Platform', ecd: 'Overdue', status: 'overdue', externalRoadmap: 'Improved Import Data Reliability' },
+          { name: 'Data Snapshots', source: 'linear', team: 'Platform', ecd: 'Mar 31', status: 'planning', externalRoadmap: null }
+        ],
+        roadmapItems: [
+          { name: 'Reliable Imports', status: 'overdue', ecd: 'Jan 30' },
+          { name: 'Data Snapshots', status: 'planned', ecd: 'Mar 31' }
+        ],
+        customers: ['Hadrian','Impulse Space','Arc Boats','Hermeus','General Matter','Relativity Space'],
+        metrics: [
+          { name: 'API Uptime', maturity: 'green', trend: 'up', goal: '99.9%', current: '99.92%' },
+          { name: 'P95 Latency', maturity: 'green', trend: 'down', goal: '<500ms', current: '~380ms' },
+          { name: 'Import Success Rate', maturity: 'yellow', trend: 'up', goal: '>99%', current: '~95%' },
+          { name: 'Query Coverage', maturity: 'green', trend: 'up', goal: '100%', current: '~95%' }
+        ]
+      },
+      {
+        id: 'mcp-server', name: 'MCP Server',
+        maturity: 80, maturityLevel: 'Strong',
+        pillars: ['context'],
+        heat: 'cool', dataInstrumentation: 'instrumented',
+        projects: [
+          { name: 'ION Intelligence MVP', source: 'linear', team: 'Platform', ecd: 'Rebaselining', status: 'in-progress', externalRoadmap: null },
+          { name: 'EVAL Framework', source: 'linear', team: 'Platform', ecd: 'Ongoing', status: 'in-progress', externalRoadmap: null }
+        ],
+        roadmapItems: [
+          { name: 'ION Intelligence MVP', status: 'in-progress', ecd: 'Feb 28' },
+          { name: 'EVAL Framework', status: 'in-progress', ecd: 'Ongoing' }
+        ],
+        customers: ['Arc Boats','Hadrian'],
+        metrics: [
+          { name: 'Tool Coverage', maturity: 'green', trend: 'up', goal: '100%', current: '~85%' },
+          { name: 'Agent Session Success %', maturity: 'yellow', trend: 'up', goal: '>95%', current: '~88%' },
+          { name: 'Mutation Tool Safety', maturity: 'yellow', trend: 'up', goal: '100%', current: '~92%' }
+        ]
+      },
+      {
+        id: 'integrations-hub', name: 'Integrations Hub',
+        maturity: 25, maturityLevel: 'Early',
+        pillars: ['context','goals'],
+        heat: 'hot', dataInstrumentation: 'not-instrumented',
+        projects: [
+          { name: 'Integrations Mastery (Prismatic)', source: 'linear', team: 'Platform', ecd: 'May 1', status: 'planning', externalRoadmap: null },
+          { name: 'Build/Buy SC Integrations', source: 'linear', team: 'Supply Chain', ecd: 'Q2', status: 'planning', externalRoadmap: null }
+        ],
+        roadmapItems: [
+          { name: 'Integrations Mastery (Prismatic)', status: 'planned', ecd: 'May 1' },
+          { name: 'Build/Buy SC Integrations', status: 'planned', ecd: 'Q2' }
+        ],
+        customers: ['Arc Boats','Hadrian','Impulse Space','Hermeus','General Matter'],
+        metrics: [
+          { name: 'Active Integrations', maturity: 'grey', trend: 'flat', goal: '>10', current: '2', gap: 'Prismatic architecture required' },
+          { name: 'Integration Uptime', maturity: 'grey', trend: 'flat', goal: '99.5%', current: '—', gap: 'No monitoring on custom integrations' },
+          { name: 'Data Sync Latency', maturity: 'grey', trend: 'flat', goal: '<15 min', current: '—', gap: 'Needs integration health dashboard' }
+        ]
+      },
+      {
+        id: 'webhooks', name: 'Webhooks',
+        maturity: 75, maturityLevel: 'Strong',
+        pillars: ['context'],
+        heat: 'cool', dataInstrumentation: 'instrumented',
+        projects: [],
+        roadmapItems: [],
+        customers: ['Hadrian','Impulse Space','Arc Boats'],
+        metrics: [
+          { name: 'Delivery Success %', maturity: 'green', trend: 'up', goal: '>99%', current: '98.5%' },
+          { name: 'Avg Delivery Latency', maturity: 'green', trend: 'down', goal: '<2s', current: '~1.2s' },
+          { name: 'Active Subscriptions', maturity: 'yellow', trend: 'up', goal: '>50', current: '~30' }
+        ]
+      },
+      {
+        id: 'ion-agents', name: 'ION for Agents',
+        maturity: 10, maturityLevel: 'Aspirational',
+        pillars: ['context','joy'],
+        heat: 'warm', dataInstrumentation: 'not-instrumented',
+        projects: [
+          { name: 'Agent Orchestration — BYOA', source: 'linear', team: 'Platform', ecd: 'Q3', status: 'planning', externalRoadmap: null },
+          { name: 'Maximize Throughput Agent', source: 'linear', team: 'Platform', ecd: 'Post-MVP', status: 'planning', externalRoadmap: 'Maximize Throughput (Agentic)' }
+        ],
+        roadmapItems: [
+          { name: 'Agent Orchestration (BYOA)', status: 'planned', ecd: 'Q3' },
+          { name: 'Maximize Throughput (Agentic)', status: 'planned', ecd: 'TBD' }
+        ],
+        customers: ['Arc Boats','Hadrian'],
+        metrics: [
+          { name: 'Registered Agents', maturity: 'grey', trend: 'flat', goal: '>5', current: '0', gap: 'Agent orchestration not yet built' },
+          { name: 'Agent Session Compliance %', maturity: 'grey', trend: 'flat', goal: '100%', current: '—', gap: 'AMOL audit trail required' },
+          { name: 'Agent Value ($/session)', maturity: 'grey', trend: 'flat', goal: 'Tracked', current: '—', gap: 'Needs outcome measurement framework' }
+        ]
+      }
+    ]
+  }
+};
+
+// Cross-cutting metrics
+const CROSS_CUTTING = [
+  { category: 'Data & Analytics', metrics: [
+    { name: 'Data Freshness', maturity: 'green', goal: '<5 min', current: '~4 min' },
+    { name: 'Report Adoption', maturity: 'yellow', goal: '60%', current: '~40%' },
+    { name: 'Dashboard Coverage', maturity: 'yellow', goal: '80%', current: '~55%' }
+  ]},
+  { category: 'Financial', metrics: [
+    { name: 'Mfg Cost/Unit', maturity: 'grey', goal: 'Tracked', gap: 'ION for Finance (Q1)' },
+    { name: 'Labor % of Cost', maturity: 'grey', goal: 'Tracked', gap: 'Needs labor tracking integration' },
+    { name: 'Material Yield Variance', maturity: 'grey', goal: '<5%', gap: 'Needs yield vs material input calc' }
+  ]},
+  { category: 'Joy (Workforce)', metrics: [
+    { name: 'Voluntary Usage Rate', maturity: 'yellow', goal: '>80%', current: '~60%' },
+    { name: 'Time-to-Productivity', maturity: 'grey', goal: '<2 weeks', gap: 'Needs onboarding telemetry' },
+    { name: 'Training Completion %', maturity: 'grey', goal: '>90%', gap: 'Needs training module' }
+  ]},
+  { category: 'Compliance', metrics: [
+    { name: 'Non-Compliance Events/Yr', maturity: 'yellow', goal: '0', current: '—' },
+    { name: 'Audit Pass Rate', maturity: 'yellow', goal: '100%', current: '~92%' },
+    { name: 'Certification Coverage', maturity: 'grey', goal: '100%', gap: 'Needs cert tracking per customer' }
+  ]}
+];
+
+// ── LAYOUT POSITIONS (% of container) ──────────────────────────────────────
+// 4-zone layout: Supply (top-left), Production (top-right), Quality (middle), Interop (bottom strip)
+const LAYOUT = {
+  // Supply Chain — top left (5 stations, 2 rows)
+  'purchasing':      { left: 2,  top: 4,  zone: 'supply' },
+  'receiving':       { left: 18, top: 4,  zone: 'supply' },
+  'parts-bom':       { left: 2,  top: 24, zone: 'supply' },
+  'inventory':       { left: 18, top: 24, zone: 'supply' },
+  'kitting':         { left: 34, top: 14, zone: 'supply' },
+
+  // Production — top right (4 stations, 2x2)
+  'procedures':      { left: 52, top: 4,  zone: 'production' },
+  'run-execution':   { left: 68, top: 4,  zone: 'production' },
+  'barcode':         { left: 52, top: 24, zone: 'production' },
+  'tools-locations': { left: 68, top: 24, zone: 'production' },
+
+  // Quality — middle band (4 stations)
+  'issue-capture':    { left: 2,  top: 50, zone: 'quality' },
+  'disposition':      { left: 18, top: 50, zone: 'quality' },
+  'capa':             { left: 34, top: 50, zone: 'quality' },
+  'trace-compliance': { left: 50, top: 50, zone: 'quality' },
+
+  // Interoperability — bottom strip (6 stations)
+  'ion-actions':      { left: 1,  top: 77, zone: 'interop' },
+  'graphql-api':      { left: 16, top: 77, zone: 'interop' },
+  'mcp-server':       { left: 31, top: 77, zone: 'interop' },
+  'integrations-hub': { left: 46, top: 77, zone: 'interop' },
+  'webhooks':         { left: 61, top: 77, zone: 'interop' },
+  'ion-agents':       { left: 76, top: 77, zone: 'interop' }
+};
+
+// Flow connections: [from, to, zoneCross?]
+const FLOW_CONNECTIONS = [
+  // Supply Chain
+  ['purchasing', 'receiving', false],
+  ['receiving', 'parts-bom', false],
+  ['parts-bom', 'inventory', false],
+  ['inventory', 'kitting', false],
+
+  // Supply → Production (zone cross)
+  ['kitting', 'procedures', true],
+
+  // Production
+  ['procedures', 'run-execution', false],
+  ['run-execution', 'barcode', false],
+  ['barcode', 'tools-locations', false],
+
+  // Production → Quality (zone cross)
+  ['run-execution', 'issue-capture', true],
+
+  // Quality
+  ['issue-capture', 'disposition', false],
+  ['disposition', 'capa', false],
+  ['capa', 'trace-compliance', false],
+
+  // Zone → Interop crosses
+  ['procedures', 'ion-actions', true],
+  ['kitting', 'integrations-hub', true],
+  ['issue-capture', 'ion-actions', true],
+
+  // Interop internal
+  ['ion-actions', 'graphql-api', false],
+  ['graphql-api', 'mcp-server', false],
+  ['mcp-server', 'integrations-hub', false],
+  ['integrations-hub', 'webhooks', false],
+  ['webhooks', 'ion-agents', false]
+];
+
+// Zone background definitions
+const ZONES = [
+  {
+    id: 'supply',
+    label: 'Supply Chain',
+    color: 'var(--supply)',
+    bg: 'var(--supply-dim)',
+    left: 0.5, top: 0.5, width: 49, height: 44
+  },
+  {
+    id: 'production',
+    label: 'Production',
+    color: 'var(--production)',
+    bg: 'var(--production-dim)',
+    left: 50, top: 0.5, width: 49, height: 44
+  },
+  {
+    id: 'quality',
+    label: 'Quality',
+    color: 'var(--quality)',
+    bg: 'var(--quality-dim)',
+    left: 0.5, top: 46, width: 65, height: 25
+  },
+  {
+    id: 'interop',
+    label: 'Interoperability',
+    color: 'var(--interop)',
+    bg: 'var(--interop-dim)',
+    left: 0.5, top: 73, width: 99, height: 26,
+    extraClass: 'interop-zone'
+  }
+];
+
+// ── STATE ───────────────────────────────────────────────────────────────────
+let currentView = 'software';
+let heatOn = false;
+let activePillar = null;
+let selectedStation = null;
+
+// ── HELPER: find station data by id ─────────────────────────────────────────
+function findStation(id) {
+  for (const [laneKey, lane] of Object.entries(STATIONS)) {
+    for (const s of lane.stations) {
+      if (s.id === id) return { station: s, laneKey, lane };
+    }
+  }
+  return null;
+}
+
+// ── RENDER ──────────────────────────────────────────────────────────────────
+function render() {
+  const floor = document.getElementById('floorplan');
+  floor.innerHTML = '';
+
+  renderZones(floor);
+  renderAutoplanOverlay(floor);
+  renderInteropConnectors(floor);
+  renderDockMarkers(floor);
+  renderStationCards(floor);
+  renderFlowPaths(floor);
+  updateAssembly();
+}
+
+function renderZones(container) {
+  ZONES.forEach(z => {
+    const el = document.createElement('div');
+    el.className = 'zone-bg' + (z.extraClass ? ' ' + z.extraClass : '');
+    el.style.cssText = `left:${z.left}%;top:${z.top}%;width:${z.width}%;height:${z.height}%;background:${z.bg};border:1px solid rgba(255,255,255,0.03);`;
+    el.innerHTML = `<span class="zone-watermark" style="color:${z.color}">${z.label}</span>`;
+    container.appendChild(el);
+  });
+}
+
+function renderAutoplanOverlay(container) {
+  const supplyZone = ZONES.find(z => z.id === 'supply');
+  if (!supplyZone) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'autoplan-overlay';
+  overlay.style.cssText = `left:${supplyZone.left - 0.3}%;top:${supplyZone.top - 0.3}%;width:${supplyZone.width + 0.6}%;height:${supplyZone.height + 0.6}%;`;
+
+  overlay.innerHTML = `
+    <div class="autoplan-label">AUTOPLAN — Intelligence Layer</div>
+    <div class="autoplan-capabilities">
+      ${AUTOPLAN_OVERLAY.capabilities.map(c => `<span class="autoplan-chip">${c}</span>`).join('')}
+    </div>
+  `;
+
+  overlay.addEventListener('click', (e) => {
+    // Only fire if clicking the overlay itself, not a station card inside it
+    if (e.target.closest('.station-card')) return;
+    openAutoplanDetail();
+  });
+
+  container.appendChild(overlay);
+}
+
+function renderInteropConnectors(container) {
+  // Vertical dashed lines from each upper zone down to the interop strip
+  const connectorPositions = [
+    { left: 25, top: 44, height: 29 },  // Supply → Interop
+    { left: 65, top: 44, height: 29 },  // Production → Interop
+    { left: 45, top: 71, height: 2 }    // Quality → Interop
+  ];
+
+  connectorPositions.forEach(pos => {
+    const el = document.createElement('div');
+    el.className = 'interop-connector';
+    el.style.cssText = `left:${pos.left}%;top:${pos.top}%;height:${pos.height}%;`;
+    container.appendChild(el);
+  });
+}
+
+function renderDockMarkers(container) {
+  const docks = [
+    { text: 'RECEIVING DOCK ▼', left: '2%', top: '0.5%' },
+    { text: '▲ SHIPPING EXIT', left: '2%', bottom: '1%' }
+  ];
+  docks.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'dock-marker';
+    el.textContent = d.text;
+    el.style.left = d.left;
+    if (d.top) el.style.top = d.top;
+    if (d.bottom) el.style.bottom = d.bottom;
+    container.appendChild(el);
+  });
+}
+
+function renderStationCards(container) {
+  for (const [laneKey, lane] of Object.entries(STATIONS)) {
+    lane.stations.forEach(s => {
+      const pos = LAYOUT[s.id];
+      if (!pos) return;
+
+      const card = document.createElement('div');
+      card.className = 'station-card zone-' + pos.zone + (currentView === 'metrics' ? ' metrics-mode' : '');
+      if (selectedStation === s.id) card.classList.add('selected');
+      card.dataset.id = s.id;
+      card.dataset.lane = laneKey;
+
+      card.style.left = pos.left + '%';
+      card.style.top = pos.top + '%';
+
+      // Pillar filtering
+      if (activePillar && !s.pillars.includes(activePillar)) {
+        card.style.opacity = '0.25';
+      } else {
+        card.style.opacity = '1';
+      }
+
+      // Heat overlay
+      if (heatOn) {
+        if (currentView === 'software') {
+          card.classList.add('heat-overlay-' + s.heat);
+        } else {
+          const greyCount = s.metrics.filter(m => m.maturity === 'grey').length;
+          if (greyCount >= 3) card.classList.add('heat-overlay-hot');
+          else if (greyCount >= 1) card.classList.add('heat-overlay-warm');
+          else card.classList.add('heat-overlay-cool');
+        }
+      }
+
+      card.innerHTML = renderStationContent(s, lane.color);
+      card.addEventListener('click', () => openDetail(s, laneKey, lane));
+      card.addEventListener('mouseenter', (e) => showTooltip(e, s));
+      card.addEventListener('mouseleave', hideTooltip);
+
+      container.appendChild(card);
+    });
+  }
+}
+
+function renderFlowPaths(container) {
+  const rect = container.getBoundingClientRect();
+  const W = rect.width;
+  const H = rect.height;
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.classList.add('flow-svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
+
+  // Arrow markers
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const colors = { supply: '#93c47d', production: '#e06666', quality: '#f6b26b', interop: '#00d4ff', cross: '#8b8d98' };
+  for (const [key, color] of Object.entries(colors)) {
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    marker.setAttribute('id', 'arrow-' + key);
+    marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('refX', '10');
+    marker.setAttribute('refY', '5');
+    marker.setAttribute('markerWidth', '6');
+    marker.setAttribute('markerHeight', '6');
+    marker.setAttribute('orient', 'auto-start-reverse');
+    const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    poly.setAttribute('points', '0,2 10,5 0,8');
+    poly.setAttribute('fill', color);
+    marker.appendChild(poly);
+    defs.appendChild(marker);
+  }
+  svg.appendChild(defs);
+
+  FLOW_CONNECTIONS.forEach(([fromId, toId, zoneCross]) => {
+    const fromPos = LAYOUT[fromId];
+    const toPos = LAYOUT[toId];
+    if (!fromPos || !toPos) return;
+
+    // Card center calculations — account for different widths
+    const fromIsInterop = fromPos.zone === 'interop';
+    const toIsInterop = toPos.zone === 'interop';
+    const fromCardW = (fromIsInterop ? 0.07 : 0.0775);
+    const toCardW = (toIsInterop ? 0.07 : 0.0775);
+
+    const x1 = (fromPos.left / 100 + fromCardW) * W;
+    const y1 = (fromPos.top / 100 + 0.07) * H;
+    const x2 = (toPos.left / 100 + toCardW) * W;
+    const y2 = (toPos.top / 100 + 0.07) * H;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    let d;
+
+    if (Math.abs(dy) < 20) {
+      d = `M${x1},${y1} L${x2},${y2}`;
+    } else if (Math.abs(dx) < 20) {
+      d = `M${x1},${y1} L${x2},${y2}`;
+    } else {
+      const cx1 = x1 + dx * 0.4;
+      const cy1 = y1;
+      const cx2 = x2 - dx * 0.4;
+      const cy2 = y2;
+      d = `M${x1},${y1} C${cx1},${cy1} ${cx2},${cy2} ${x2},${y2}`;
+    }
+
+    path.setAttribute('d', d);
+
+    let strokeColor;
+    let markerKey;
+    if (zoneCross) {
+      strokeColor = 'rgba(139,141,152,0.5)';
+      markerKey = 'cross';
+      path.classList.add('flow-path', 'zone-cross');
+    } else {
+      const zone = fromPos.zone;
+      const zoneColors = {
+        supply: 'rgba(147,196,125,0.35)',
+        production: 'rgba(224,102,102,0.35)',
+        quality: 'rgba(246,178,107,0.35)',
+        interop: 'rgba(0,212,255,0.35)'
+      };
+      strokeColor = zoneColors[zone] || 'rgba(139,141,152,0.3)';
+      markerKey = zone;
+      path.classList.add('flow-path');
+    }
+
+    path.setAttribute('stroke', strokeColor);
+    path.setAttribute('marker-end', `url(#arrow-${markerKey})`);
+    svg.appendChild(path);
+  });
+
+  container.appendChild(svg);
+}
+
+function renderStationContent(s, color) {
+  const maturityColor = s.maturity >= 70 ? 'var(--green)' : s.maturity >= 45 ? 'var(--yellow)' : 'var(--red)';
+  const heatClass = s.heat === 'hot' ? 'heat-hot' : s.heat === 'warm' ? 'heat-warm' : 'heat-cool';
+  const projectCount = s.projects ? s.projects.length : 0;
+  const dataClass = s.dataInstrumentation || 'not-instrumented';
+  const dataLabel = dataClass === 'instrumented' ? 'Data' : dataClass === 'partial' ? 'Partial' : 'No Data';
+
+  // Software view
+  const softwareHtml = `
+    <div class="software-view">
+      <div class="heat-indicator ${heatClass}">${s.heat}</div>
+      <div class="station-name">${s.name}</div>
+      <div class="sw-maturity">
+        <div class="maturity-bar-track"><div class="maturity-bar-fill" style="width:${s.maturity}%;background:${maturityColor}"></div></div>
+        <div class="maturity-label">${s.maturityLevel} · ${s.maturity}%</div>
+      </div>
+      <div class="sw-stats">
+        <div class="sw-stat"><span class="num">${s.roadmapItems.length}</span> roadmap</div>
+        <div class="sw-stat"><span class="num">${projectCount}</span> projects</div>
+      </div>
+      <div class="data-indicator">
+        <span class="data-dot ${dataClass}"></span> ${dataLabel}
+      </div>
+    </div>`;
+
+  // Metrics view
+  const metricsHtml = `
+    <div class="metrics-view">
+      <div class="station-name">${s.name}</div>
+      ${s.metrics.slice(0, 4).map(m => `
+        <div class="kpi-row">
+          <div class="kpi-dot ${m.maturity}"></div>
+          <div class="kpi-name">${m.name}</div>
+          <div class="kpi-trend ${m.trend}">${m.trend === 'up' ? '↑' : m.trend === 'down' ? '↓' : '—'}</div>
+        </div>
+      `).join('')}
+      ${s.metrics.length > 4 ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">+${s.metrics.length - 4} more</div>` : ''}
+      <div class="metric-gap-summary">
+        <span class="gap-count">${s.metrics.filter(m => m.maturity === 'grey').length}</span> gaps ·
+        <span style="color:var(--green)">${s.metrics.filter(m => m.maturity === 'green' || m.maturity === 'blue').length}</span> tracked
+      </div>
+    </div>`;
+
+  return softwareHtml + metricsHtml;
+}
+
+function updateAssembly() {
+  const allStations = Object.values(STATIONS).flatMap(l => l.stations);
+  const avg = Math.round(allStations.reduce((s, st) => s + st.maturity, 0) / allStations.length);
+  document.getElementById('assemblyFill').style.width = avg + '%';
+  document.getElementById('assemblyPct').textContent = avg + '%';
+}
+
+// ── VIEW TOGGLE ─────────────────────────────────────────────────────────────
+function setView(view) {
+  currentView = view;
+  document.querySelectorAll('.view-toggle button').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.view-toggle button:${view === 'software' ? 'first' : 'last'}-child`).classList.add('active');
+  document.getElementById('softwareLegend').style.display = view === 'software' ? 'flex' : 'none';
+  document.getElementById('metricsLegend').style.display = view === 'metrics' ? 'flex' : 'none';
+  render();
+}
+
+// ── HEAT MAP ────────────────────────────────────────────────────────────────
+function toggleHeat() {
+  heatOn = !heatOn;
+  document.getElementById('heatBtn').classList.toggle('active', heatOn);
+  render();
+}
+
+// ── PILLAR TOGGLE ───────────────────────────────────────────────────────────
+function togglePillar(pillar) {
+  activePillar = activePillar === pillar ? null : pillar;
+  document.querySelectorAll('.pillar-btn').forEach(b => b.classList.toggle('active', b.dataset.pillar === activePillar));
+  document.querySelectorAll('.pillar-badge').forEach(b => b.classList.toggle('active', b.dataset.pillar === activePillar));
+  render();
+}
+
+// ── TOOLTIP ─────────────────────────────────────────────────────────────────
+function showTooltip(e, s) {
+  const tt = document.getElementById('tooltip');
+  const ttTitle = document.getElementById('ttTitle');
+  const ttBody = document.getElementById('ttBody');
+  ttTitle.textContent = s.name;
+  const projectCount = s.projects ? s.projects.length : 0;
+  const dataLabel = s.dataInstrumentation === 'instrumented' ? 'Instrumented' : s.dataInstrumentation === 'partial' ? 'Partial' : 'Not Instrumented';
+  if (currentView === 'software') {
+    ttBody.innerHTML = `Maturity: ${s.maturityLevel} (${s.maturity}%)<br>${s.roadmapItems.length} roadmap items · ${projectCount} projects<br>Customer heat: ${s.heat}<br>Data: ${dataLabel}<br>Pillars: ${s.pillars.join(', ')}`;
+  } else {
+    const tracked = s.metrics.filter(m => m.maturity === 'green' || m.maturity === 'blue').length;
+    const gaps = s.metrics.filter(m => m.maturity === 'grey').length;
+    ttBody.innerHTML = `${s.metrics.length} factory KPIs<br>${tracked} actively tracked · ${gaps} gaps<br>Data: ${dataLabel}<br>Pillars: ${s.pillars.join(', ')}`;
+  }
+  tt.style.left = (e.clientX + 16) + 'px';
+  tt.style.top = (e.clientY - 10) + 'px';
+  tt.classList.add('visible');
+}
+
+function hideTooltip() {
+  document.getElementById('tooltip').classList.remove('visible');
+}
+
+// ── DETAIL PANEL ────────────────────────────────────────────────────────────
+function openDetail(s, laneKey, lane) {
+  selectedStation = s.id;
+  const panel = document.getElementById('detailPanel');
+  const content = document.getElementById('detailContent');
+
+  const laneColors = { supply: 'var(--supply)', production: 'var(--production)', quality: 'var(--quality)', interop: 'var(--interop)' };
+  const laneBgs = { supply: 'var(--supply-dim)', production: 'var(--production-dim)', quality: 'var(--quality-dim)', interop: 'var(--interop-dim)' };
+  const maturityColor = s.maturity >= 70 ? 'var(--green)' : s.maturity >= 45 ? 'var(--yellow)' : 'var(--red)';
+
+  const statusColors = { 'in-progress': 'var(--yellow)', 'planned': 'var(--accent)', 'overdue': 'var(--red)', 'shipped': 'var(--green)', 'not-started': 'var(--text-muted)', 'planning': 'var(--blue)', 'maintenance': 'var(--green)' };
+  const statusLabels = { 'in-progress': 'In Progress', 'planned': 'Planned', 'overdue': 'Overdue', 'shipped': 'Shipped', 'not-started': 'Not Started', 'planning': 'Planning', 'maintenance': 'Maintenance' };
+
+  const dataLabel = s.dataInstrumentation === 'instrumented' ? 'Instrumented' : s.dataInstrumentation === 'partial' ? 'Partial' : 'Not Instrumented';
+  const dataColor = s.dataInstrumentation === 'instrumented' ? 'var(--green)' : s.dataInstrumentation === 'partial' ? 'var(--yellow)' : 'var(--grey-metric)';
+
+  // Build projects section
+  const projectsHtml = s.projects && s.projects.length > 0 ? s.projects.map(p => {
+    const sc = statusColors[p.status] || 'var(--text-muted)';
+    const sl = statusLabels[p.status] || p.status;
+    return `
+      <div class="project-item">
+        <div class="proj-name">${p.name}</div>
+        <div class="proj-meta">
+          <span class="proj-status" style="background:${sc}22;color:${sc}">${sl}</span>
+          <span>Team: ${p.team}</span>
+          <span>ECD: ${p.ecd}</span>
+          ${p.externalRoadmap ? `<span style="color:var(--blue)">External: ${p.externalRoadmap}</span>` : ''}
+        </div>
+      </div>`;
+  }).join('') : '<div style="font-size:12px;color:var(--text-muted)">No active domain projects</div>';
+
+  content.innerHTML = `
+    <div class="detail-header">
+      <h2>${s.name}</h2>
+      <span class="lane-tag" style="background:${laneBgs[laneKey]};color:${laneColors[laneKey]}">${lane.label}</span>
+    </div>
+
+    <div class="detail-tabs">
+      <button class="detail-tab active" onclick="switchDetailTab(this, 'sw-tab', 'mx-tab')">Software</button>
+      <button class="detail-tab" onclick="switchDetailTab(this, 'mx-tab', 'sw-tab')">Metrics</button>
+    </div>
+
+    <!-- Software Tab -->
+    <div id="sw-tab">
+      <div class="detail-section">
+        <h3>Maturity</h3>
+        <div class="detail-maturity-bar"><div class="detail-maturity-fill" style="width:${s.maturity}%;background:${maturityColor}"></div></div>
+        <div style="font-size:12px;color:var(--text-muted)">${s.maturityLevel} — ${s.maturity}%</div>
+      </div>
+
+      <div class="detail-section">
+        <h3>Data Instrumentation</h3>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
+          <span class="data-dot ${s.dataInstrumentation}" style="width:9px;height:9px;"></span>
+          <span style="color:${dataColor};font-weight:600">${dataLabel}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+          ${s.dataInstrumentation === 'instrumented' ? 'Data flowing through Snowflake pipeline' : s.dataInstrumentation === 'partial' ? 'Some data exists but not fully productized' : 'Needs new data tables / not yet built'}
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <h3>Roadmap Items (${s.roadmapItems.length})</h3>
+        ${s.roadmapItems.length ? s.roadmapItems.map(r => `
+          <div class="roadmap-chip">
+            <div class="status-dot" style="background:${statusColors[r.status] || 'var(--text-muted)'}"></div>
+            ${r.name} <span style="color:var(--text-muted);font-size:10px;margin-left:4px">${r.ecd}</span>
+          </div>
+        `).join('') : '<div style="font-size:12px;color:var(--text-muted)">No committed roadmap items</div>'}
+      </div>
+
+      <div class="detail-section">
+        <h3>Domain Projects (${s.projects ? s.projects.length : 0})</h3>
+        ${projectsHtml}
+      </div>
+
+      <div class="detail-section">
+        <h3>Customer Signals</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          ${s.customers.map(c => `<span class="roadmap-chip">${c}</span>`).join('')}
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Heat: <span style="color:${s.heat === 'hot' ? 'var(--red)' : s.heat === 'warm' ? 'var(--yellow)' : 'var(--green)'}">${s.heat}</span></div>
+      </div>
+
+      <div class="detail-section">
+        <h3>Pillars</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${s.pillars.map(p => {
+            const names = { joy: 'Joy', goals: 'Goals & Compliance', context: 'Context & Connectivity' };
+            return `<span class="roadmap-chip">${names[p]}</span>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Metrics Tab -->
+    <div id="mx-tab" style="display:none">
+      <div class="detail-section">
+        <h3>Factory KPIs (${s.metrics.length})</h3>
+        ${s.metrics.map(m => `
+          <div class="kpi-detail-card">
+            <div class="kpi-header">
+              <span class="kpi-title">${m.name}</span>
+              <span class="kpi-maturity-badge badge-${m.maturity}">${m.maturity === 'grey' ? 'Not Tracked' : m.maturity === 'yellow' ? 'Raw Data' : m.maturity === 'green' ? 'Active' : 'AI-Augmented'}</span>
+            </div>
+            <div class="kpi-value">Current: ${m.current || '—'} · Goal: ${m.goal || '—'} · Trend: ${m.trend === 'up' ? '↑ Improving' : m.trend === 'down' ? '↓ Declining' : '— Flat'}</div>
+            ${m.gap ? `<div class="kpi-gap">Gap: ${m.gap}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="detail-section">
+        <h3>Gap Summary</h3>
+        <div style="font-size:12px;color:var(--text-muted)">
+          <span style="color:var(--green)">${s.metrics.filter(m => m.maturity === 'green' || m.maturity === 'blue').length}</span> tracked ·
+          <span style="color:var(--yellow)">${s.metrics.filter(m => m.maturity === 'yellow').length}</span> raw data ·
+          <span style="color:#999">${s.metrics.filter(m => m.maturity === 'grey').length}</span> not tracked
+        </div>
+      </div>
+    </div>
+  `;
+
+  panel.classList.add('open');
+  render();
+}
+
+// ── AUTOPLAN DETAIL ─────────────────────────────────────────────────────────
+function openAutoplanDetail() {
+  selectedStation = null;
+  const panel = document.getElementById('detailPanel');
+  const content = document.getElementById('detailContent');
+
+  const statusColors = { 'maintenance': 'var(--green)', 'planned': 'var(--accent)', 'in-progress': 'var(--yellow)' };
+
+  content.innerHTML = `
+    <div class="autoplan-detail-header">
+      <h2>AUTOPLAN</h2>
+      <span class="autoplan-status-badge">Maintenance Mode</span>
+    </div>
+
+    <div class="detail-section">
+      <h3>Intelligence Layer</h3>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+        Cross-cutting intelligence overlay across all Supply Chain workflows. Optimizes demand planning, clear-to-build calculations, and schedule optimization. Currently in maintenance mode — no new feature investment this cycle.
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h3>Capabilities</h3>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${AUTOPLAN_OVERLAY.capabilities.map(c => `<span class="roadmap-chip" style="border-color:rgba(0,200,83,0.3);color:var(--green)">${c}</span>`).join('')}
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h3>Metrics</h3>
+      ${AUTOPLAN_OVERLAY.metrics.map(m => `
+        <div class="autoplan-metric-card">
+          <div class="metric-name">${m.name}</div>
+          <div class="metric-values">
+            Current: ${m.current} · Goal: ${m.goal} · Trend: ${m.trend === 'up' ? '↑' : m.trend === 'down' ? '↓' : '—'}
+          </div>
+          ${m.gap ? `<div style="font-size:10px;color:var(--yellow);font-style:italic;margin-top:2px;">Gap: ${m.gap}</div>` : ''}
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="detail-section">
+      <h3>Roadmap</h3>
+      ${AUTOPLAN_OVERLAY.roadmapItems.map(r => `
+        <div class="project-item">
+          <div class="proj-name">${r.name}</div>
+          <div class="proj-meta">
+            <span class="proj-status" style="background:${statusColors[r.status]}22;color:${statusColors[r.status]}">${r.status === 'maintenance' ? 'Maintenance' : r.status === 'planned' ? 'Planned' : 'In Progress'}</span>
+            <span>ECD: ${r.ecd}</span>
+          </div>
+          ${r.notes ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${r.notes}</div>` : ''}
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="detail-section">
+      <h3>Owner</h3>
+      <div style="font-size:12px;color:var(--text-muted)">Karan Talati (CEO) — contained scope, Andrew Poggione owns reliability</div>
+    </div>
+  `;
+
+  panel.classList.add('open');
+}
+
+function switchDetailTab(btn, showId, hideId) {
+  document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(showId).style.display = 'block';
+  document.getElementById(hideId).style.display = 'none';
+}
+
+function closeDetail() {
+  selectedStation = null;
+  document.getElementById('detailPanel').classList.remove('open');
+  render();
+}
+
+// Close panel on Escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
+// Debounced resize to recompute SVG paths
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(render, 150);
+});
+
+// ── INIT ────────────────────────────────────────────────────────────────────
+render();
+
+// UTC Clock for classification bar
+function updateClockFF() {
+  const el = document.getElementById('utc-clock-ff');
+  if (el) {
+    const now = new Date();
+    el.textContent = now.toISOString().replace('T', ' // ').slice(0, 22) + ' UTC';
+  }
+}
+updateClockFF();
+setInterval(updateClockFF, 1000);
+</script>
+</div><!-- end ff-content -->
+</body>
+</html>
