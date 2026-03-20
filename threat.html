@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FR-MCR // THREAT & STATUS BOARD</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #070a0d;
+    --surface: #0d1117;
+    --surface-2: #151b23;
+    --border: #1c2630;
+    --text: #c9d1d9;
+    --text-muted: #6e7681;
+    --fr-green: #00c853;
+    --fr-green-dim: rgba(0,200,83,0.12);
+    --fr-green-glow: #00ff88;
+    --amber: #f0b429;
+    --amber-dim: rgba(240,180,41,0.12);
+    --red-alert: #ff3b3b;
+    --red-alert-dim: rgba(255,59,59,0.1);
+    --cyan: #00d4ff;
+    --cyan-dim: rgba(0,212,255,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .classification-bar {
+    background: var(--surface);
+    border-bottom: 2px solid var(--fr-green);
+    padding: 8px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--fr-green);
+    position: relative;
+    z-index: 10;
+  }
+  .classification-bar .timestamp { color: var(--text-muted); letter-spacing: 1px; font-size: 10px; }
+
+  .watermark {
+    position: fixed;
+    bottom: 12px;
+    right: 20px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(0,200,83,0.2);
+    text-transform: uppercase;
+    z-index: 10;
+  }
+
+  /* Threat level strip */
+  .threat-strip {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    position: relative;
+    z-index: 10;
+  }
+
+  .threat-level {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+  }
+  .threat-level.nominal { color: var(--fr-green); text-shadow: 0 0 20px rgba(0,200,83,0.4); }
+  .threat-level.elevated { color: var(--amber); text-shadow: 0 0 20px rgba(240,180,41,0.4); }
+  .threat-level.critical { color: var(--red-alert); text-shadow: 0 0 20px rgba(255,59,59,0.4); }
+
+  .threat-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  @keyframes threat-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  .threat-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    animation: threat-pulse 2s ease-in-out infinite;
+  }
+  .threat-indicator.green { background: var(--fr-green); box-shadow: 0 0 12px rgba(0,200,83,0.6); }
+  .threat-indicator.amber { background: var(--amber); box-shadow: 0 0 12px rgba(240,180,41,0.6); }
+
+  /* Main layout */
+  .main {
+    display: flex;
+    height: calc(100vh - 105px);
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Panel common */
+  .panel {
+    padding: 16px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .panel-header {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--fr-green);
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Left panel — system health */
+  .health-panel {
+    flex: 0 0 50%;
+    border-right: 1px solid var(--border);
+  }
+
+  .service-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .service-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .service-tile.healthy { border-left: 3px solid var(--fr-green); }
+  .service-tile.degraded { border-left: 3px solid var(--amber); }
+  .service-tile.down { border-left: 3px solid var(--red-alert); }
+
+  .service-name {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status-dot.green { background: var(--fr-green); box-shadow: 0 0 8px rgba(0,200,83,0.5); }
+  .status-dot.amber { background: var(--amber); box-shadow: 0 0 8px rgba(240,180,41,0.5); }
+  .status-dot.red { background: var(--red-alert); box-shadow: 0 0 8px rgba(255,59,59,0.5); }
+
+  .service-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .service-stats .val { color: var(--text); font-weight: 500; }
+
+  /* EKG heartbeat line */
+  .heartbeat-line {
+    height: 24px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+  .heartbeat-line svg { width: 100%; height: 100%; }
+  .ekg-line {
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+  }
+  .ekg-line.green { stroke: var(--fr-green); filter: drop-shadow(0 0 3px rgba(0,200,83,0.5)); }
+  .ekg-line.amber { stroke: var(--amber); filter: drop-shadow(0 0 3px rgba(240,180,41,0.5)); }
+
+  @keyframes ekg-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .ekg-group { animation: ekg-scroll 4s linear infinite; }
+
+  /* Center panel — security posture */
+  .security-panel {
+    flex: 0 0 25%;
+    border-right: 1px solid var(--border);
+  }
+
+  .compliance-badge {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .badge-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .badge-icon.active { background: var(--fr-green-dim); color: var(--fr-green); border: 1px solid rgba(0,200,83,0.3); }
+  .badge-icon.pending { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(240,180,41,0.3); }
+  .badge-icon.target { background: var(--cyan-dim); color: var(--cyan); border: 1px solid rgba(0,212,255,0.3); }
+
+  .badge-info .badge-name { font-size: 11px; font-weight: 600; }
+  .badge-info .badge-status { font-size: 10px; color: var(--text-muted); }
+
+  .security-stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .sec-stat-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .sec-stat-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--fr-green);
+  }
+  .sec-stat-detail { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+  /* Right panel — incident feed */
+  .incident-panel {
+    flex: 0 0 25%;
+  }
+
+  .filter-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .filter-tab {
+    padding: 4px 10px;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+  }
+  .filter-tab.active {
+    color: var(--fr-green);
+    border-color: var(--fr-green);
+    background: var(--fr-green-dim);
+  }
+  .filter-tab:hover { border-color: var(--fr-green); color: var(--text); }
+
+  .incident-feed {
+    max-height: calc(100% - 80px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .incident-item {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(28,38,48,0.5);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .incident-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 3px;
+  }
+  .incident-time { font-size: 9px; color: var(--text-muted); }
+  .severity-badge {
+    font-size: 8px;
+    letter-spacing: 1px;
+    padding: 1px 6px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .severity-badge.info { background: var(--cyan-dim); color: var(--cyan); }
+  .severity-badge.warn { background: var(--amber-dim); color: var(--amber); }
+  .severity-badge.crit { background: var(--red-alert-dim); color: var(--red-alert); }
+  .severity-badge.ok { background: var(--fr-green-dim); color: var(--fr-green); }
+  .incident-text { color: var(--text); }
+  .incident-text .src { color: var(--text-muted); }
+
+  /* Bottom escalation bar */
+  .escalation-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 24px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    z-index: 10;
+    overflow-x: auto;
+  }
+  .escalation-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .escalation-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    font-size: 11px;
+  }
+  .esc-bar {
+    width: 4px;
+    height: 20px;
+    border-radius: 2px;
+  }
+  .esc-bar.critical { background: var(--red-alert); box-shadow: 0 0 6px rgba(255,59,59,0.4); }
+  .esc-bar.elevated { background: var(--amber); box-shadow: 0 0 6px rgba(240,180,41,0.4); }
+  .esc-bar.monitoring { background: var(--fr-green); box-shadow: 0 0 6px rgba(0,200,83,0.4); }
+  .esc-name { font-weight: 500; }
+  .esc-status { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="classification-bar">
+  <span>UNCLASSIFIED // FIRST RESONANCE // ION FACTORY OS</span>
+  <span style="display:flex;align-items:center;gap:12px;">
+    <span class="stale-indicator" id="stale-indicator" style="display:none;color:var(--amber);font-size:10px;letter-spacing:2px;animation:threat-pulse 1.5s ease-in-out infinite;">DATA STALE</span>
+    <span class="timestamp" id="utc-clock"></span>
+  </span>
+</div>
+
+<!-- Threat Level Strip -->
+<div class="threat-strip">
+  <div class="threat-indicator green"></div>
+  <span class="threat-label">System Threat Level:</span>
+  <span class="threat-level nominal" id="threat-display">NOMINAL</span>
+  <div class="threat-indicator green"></div>
+</div>
+
+<div class="main">
+  <!-- LEFT: System Health Matrix -->
+  <div class="panel health-panel">
+    <div class="panel-header">System Health Matrix</div>
+    <div class="service-grid" id="service-grid"></div>
+  </div>
+
+  <!-- CENTER: Security Posture -->
+  <div class="panel security-panel">
+    <div class="panel-header">Security Posture</div>
+
+    <div class="compliance-badge">
+      <div class="badge-icon active">S2</div>
+      <div class="badge-info">
+        <div class="badge-name">SOC 2 Type II</div>
+        <div class="badge-status" style="color:var(--fr-green)">Active — Renewed 2025</div>
+      </div>
+    </div>
+    <div class="compliance-badge">
+      <div class="badge-icon active">IT</div>
+      <div class="badge-info">
+        <div class="badge-name">ITAR Compliant</div>
+        <div class="badge-status" style="color:var(--fr-green)">Active — GovCloud Enabled</div>
+      </div>
+    </div>
+    <div class="compliance-badge">
+      <div class="badge-icon target">CM</div>
+      <div class="badge-info">
+        <div class="badge-name">CMMC Level 2</div>
+        <div class="badge-status" style="color:var(--cyan)">Target — 2026 H2</div>
+      </div>
+    </div>
+    <div class="compliance-badge">
+      <div class="badge-icon pending">FD</div>
+      <div class="badge-info">
+        <div class="badge-name">FedRAMP</div>
+        <div class="badge-status" style="color:var(--amber)">ON TRACK — 2027</div>
+      </div>
+    </div>
+
+    <div class="security-stat">
+      <div class="sec-stat-label">Last Vulnerability Scan</div>
+      <div class="sec-stat-value">2026-03-12</div>
+      <div class="sec-stat-detail">0 Critical / 2 Medium / 5 Low</div>
+    </div>
+
+    <div class="security-stat">
+      <div class="sec-stat-label">Last Penetration Test</div>
+      <div class="sec-stat-value">2026-01-15</div>
+      <div class="sec-stat-detail">Annual external pentest — passed</div>
+    </div>
+
+    <div class="security-stat">
+      <div class="sec-stat-label">Access Audit</div>
+      <div class="sec-stat-value">142 Users</div>
+      <div class="sec-stat-detail">12 Admin / 8 roles / 0 anomalies</div>
+    </div>
+
+    <div class="security-stat">
+      <div class="sec-stat-label">Secureframe Risk Register</div>
+      <div class="sec-stat-value" style="color:var(--fr-green)">94% Mitigated</div>
+      <div class="sec-stat-detail">47/50 controls compliant</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Incident Feed -->
+  <div class="panel incident-panel">
+    <div class="panel-header">Incident Feed</div>
+    <div class="filter-tabs">
+      <button class="filter-tab active" onclick="filterFeed('all')">All</button>
+      <button class="filter-tab" onclick="filterFeed('security')">Security</button>
+      <button class="filter-tab" onclick="filterFeed('infra')">Infra</button>
+      <button class="filter-tab" onclick="filterFeed('customer')">Customer</button>
+    </div>
+    <div class="incident-feed" id="incident-feed"></div>
+  </div>
+</div>
+
+<!-- Bottom: Active Escalations -->
+<div class="escalation-bar">
+  <span class="escalation-label">Active Escalations</span>
+  <div class="escalation-item">
+    <div class="esc-bar elevated"></div>
+    <span class="esc-name" style="color:var(--amber)">Arc Boats</span>
+    <span class="esc-status">Elevated</span>
+  </div>
+  <div class="escalation-item">
+    <div class="esc-bar monitoring"></div>
+    <span class="esc-name" style="color:var(--fr-green)">Joby Aviation</span>
+    <span class="esc-status">Monitoring</span>
+  </div>
+  <div class="escalation-item">
+    <div class="esc-bar monitoring"></div>
+    <span class="esc-name" style="color:var(--fr-green)">Saronic</span>
+    <span class="esc-status">Monitoring</span>
+  </div>
+  <div class="escalation-item">
+    <div class="esc-bar monitoring"></div>
+    <span class="esc-name" style="color:var(--fr-green)">Astranis</span>
+    <span class="esc-status">Monitoring</span>
+  </div>
+  <div class="escalation-item">
+    <div class="esc-bar monitoring"></div>
+    <span class="esc-name" style="color:var(--fr-green)">Varda</span>
+    <span class="esc-status">Monitoring</span>
+  </div>
+</div>
+
+<div class="watermark">FR-MCR // THREAT & STATUS</div>
+
+<script>
+// =============================================================================
+// UTC Clock
+// =============================================================================
+function updateClock() {
+  const now = new Date();
+  document.getElementById('utc-clock').textContent =
+    now.toISOString().replace('T', ' // ').slice(0, 22) + ' UTC';
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// =============================================================================
+// Statuspage.io Live Data Loader
+// =============================================================================
+const SOURCES = {
+  firstresonance: 'https://status.firstresonance.io/api/v2/summary.json',
+  auth0:          'https://auth0.statuspage.io/api/v2/summary.json',
+  snowflake:      'https://status.snowflake.com/api/v2/summary.json',
+  datadog:        'https://status.datadoghq.com/api/v2/summary.json',
+  incidentio:     'https://status.incident.io/api/v2/summary.json',
+};
+
+const SERVICE_MAP = [
+  {
+    label: 'APPLICATION',
+    source: 'firstresonance',
+    componentFilter: (c) => ['API', 'Application', 'Web', 'App'].some(k => c.name.includes(k)),
+  },
+  {
+    label: 'CLOUD — US WEST',
+    source: 'firstresonance',
+    componentFilter: (c) => c.name.toLowerCase().includes('us-west') || c.name.includes('US West'),
+  },
+  {
+    label: 'CLOUD — GOVCLOUD',
+    source: 'firstresonance',
+    componentFilter: (c) => c.name.toLowerCase().includes('gov'),
+  },
+  {
+    label: 'AUTHENTICATION',
+    source: 'auth0',
+    componentFilter: (c) => ['Authentication', 'Login', 'Core', 'Management API', 'Authentication API'].some(k => c.name.includes(k)),
+  },
+  {
+    label: 'DATA WAREHOUSE',
+    source: 'snowflake',
+    componentFilter: (c) => c.name.includes('AWS US West') || c.name.includes('us-west-2') || c.name.includes('AWS_US_WEST'),
+  },
+];
+
+// Source labels for incident feed
+const SOURCE_LABELS = {
+  firstresonance: 'Application',
+  auth0: 'Authentication',
+  snowflake: 'Data Warehouse',
+  datadog: 'Monitoring',
+  incidentio: 'Incident Mgmt',
+};
+
+let sourceData = {};
+let staleCount = 0;
+
+async function loadAllSources() {
+  const entries = Object.entries(SOURCES);
+  const results = await Promise.allSettled(
+    entries.map(([key, url]) => fetch(url).then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }))
+  );
+
+  let anySuccess = false;
+  results.forEach((result, i) => {
+    const key = entries[i][0];
+    if (result.status === 'fulfilled') {
+      sourceData[key] = result.value;
+      anySuccess = true;
+    }
+    // On failure, keep previous data in sourceData[key] (never blank the screen)
+  });
+
+  // Stale indicator
+  const staleEl = document.getElementById('stale-indicator');
+  if (!anySuccess) {
+    staleCount++;
+    staleEl.style.display = 'inline';
+  } else {
+    staleCount = 0;
+    staleEl.style.display = 'none';
+  }
+
+  applyServiceTiles();
+  applyThreatLevel();
+  applyIncidentFeed();
+}
+
+// =============================================================================
+// EKG Helpers
+// =============================================================================
+function generateEKG() {
+  let points = [];
+  let x = 0;
+  const y0 = 12;
+  while (x < 200) {
+    const segLen = 15 + Math.random() * 20;
+    points.push(`${x},${y0}`);
+    x += segLen;
+    points.push(`${x},${y0}`);
+    x += 2;
+    points.push(`${x},${y0 - 3}`);
+    x += 2;
+    points.push(`${x},${y0}`);
+    x += 3;
+    points.push(`${x},${y0 + 2}`);
+    x += 2;
+    points.push(`${x},${y0 - 10 - Math.random() * 4}`);
+    x += 2;
+    points.push(`${x},${y0 + 6}`);
+    x += 2;
+    points.push(`${x},${y0}`);
+    x += 5;
+    points.push(`${x},${y0 - 2}`);
+    x += 4;
+    points.push(`${x},${y0}`);
+    x += segLen * 0.5;
+  }
+  return points.join(' ');
+}
+
+function generateFlatline() {
+  return '0,12 200,12';
+}
+
+function generateDegraded() {
+  let points = [];
+  for (let x = 0; x < 200; x += 10) {
+    points.push(`${x},${12 + (Math.random() - 0.5) * 3}`);
+  }
+  return points.join(' ');
+}
+
+function offsetEKG(path, offset) {
+  return path.split(' ').map(p => {
+    const [x, y] = p.split(',');
+    return `${parseFloat(x) + offset},${y}`;
+  }).join(' ');
+}
+
+// =============================================================================
+// Map component status to our UI classes
+// =============================================================================
+function componentStatusToHealth(status) {
+  switch (status) {
+    case 'operational': return 'healthy';
+    case 'degraded_performance': return 'degraded';
+    case 'partial_outage': return 'down';
+    case 'major_outage': return 'down';
+    default: return 'unknown';
+  }
+}
+
+function worstStatus(statuses) {
+  const priority = ['major_outage', 'partial_outage', 'degraded_performance', 'operational'];
+  for (const p of priority) {
+    if (statuses.includes(p)) return p;
+  }
+  return 'unknown';
+}
+
+// =============================================================================
+// Apply Service Tiles (live data)
+// FR statuspage has zero components — use overall page status indicator instead
+// =============================================================================
+function applyServiceTiles() {
+  const grid = document.getElementById('service-grid');
+  grid.innerHTML = '';
+
+  SERVICE_MAP.forEach(tile => {
+    const data = sourceData[tile.source];
+    let health = 'unknown';
+    let statusLabel = 'UNKNOWN';
+    let matchedComponents = [];
+    let lastUpdated = '—';
+    let statsHtml = '';
+
+    const isFRSource = tile.source === 'firstresonance';
+
+    if (isFRSource) {
+      // FR statuspage returns components:[] — use overall status indicator
+      if (data && data.status) {
+        const indicator = data.status.indicator;
+        if (indicator === 'none') {
+          health = 'healthy';
+          statusLabel = 'OPERATIONAL';
+        } else if (indicator === 'minor') {
+          health = 'degraded';
+          statusLabel = 'DEGRADED';
+        } else if (indicator === 'major' || indicator === 'critical') {
+          health = 'down';
+          statusLabel = 'OUTAGE';
+        } else {
+          health = 'healthy';
+          statusLabel = 'OPERATIONAL';
+        }
+        const desc = (data.status.description || '').replace('All Systems Operational', 'All Systems Operational');
+        statsHtml = `
+          <div class="service-stats"><span>Status: <span class="val">${statusLabel}</span></span></div>
+          <div class="service-stats"><span style="font-size:9px;color:var(--text-muted)">${desc}</span></div>`;
+      } else {
+        statsHtml = `<div class="service-stats"><span>Status: <span class="val">LOADING</span></span></div><div class="service-stats"></div>`;
+      }
+    } else {
+      if (data && data.components) {
+        matchedComponents = data.components.filter(tile.componentFilter);
+        if (matchedComponents.length > 0) {
+          const worst = worstStatus(matchedComponents.map(c => c.status));
+          health = componentStatusToHealth(worst);
+          statusLabel = worst.replace(/_/g, ' ').toUpperCase();
+          const dates = matchedComponents.map(c => c.updated_at).filter(Boolean).sort().reverse();
+          if (dates.length > 0) lastUpdated = dates[0].slice(0, 10);
+        }
+      }
+      const componentCount = matchedComponents.length;
+      const operationalCount = matchedComponents.filter(c => c.status === 'operational').length;
+      statsHtml = `
+        <div class="service-stats">
+          <span>Status: <span class="val">${statusLabel}</span></span>
+          <span>Components: <span class="val">${operationalCount}/${componentCount}</span></span>
+        </div>
+        <div class="service-stats">
+          <span>Last update: <span class="val">${lastUpdated}</span></span>
+        </div>`;
+    }
+
+    const statusClass = health === 'healthy' ? 'healthy' : health === 'degraded' ? 'degraded' : health === 'down' ? 'down' : 'degraded';
+    const dotClass = health === 'healthy' ? 'green' : health === 'degraded' ? 'amber' : health === 'down' ? 'red' : 'amber';
+    const ekgClass = health === 'healthy' ? 'green' : 'amber';
+
+    let ekgPath;
+    if (health === 'healthy') {
+      ekgPath = generateEKG();
+    } else if (health === 'down') {
+      ekgPath = generateFlatline();
+    } else {
+      ekgPath = generateDegraded();
+    }
+
+    grid.innerHTML += `
+      <div class="service-tile ${statusClass}">
+        <div class="service-name">
+          <div class="status-dot ${dotClass}"></div>
+          ${tile.label}
+        </div>
+        ${statsHtml}
+        <div class="heartbeat-line">
+          <svg viewBox="0 0 400 24" preserveAspectRatio="none">
+            <g class="ekg-group">
+              <polyline class="ekg-line ${ekgClass}" points="${ekgPath}"/>
+              <polyline class="ekg-line ${ekgClass}" points="${offsetEKG(ekgPath, 200)}"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+    `;
+  });
+}
+
+// =============================================================================
+// Apply Threat Level — FR-only indicator (Auth0/Snowflake shown in tiles only)
+// =============================================================================
+function applyThreatLevel() {
+  const frData = sourceData.firstresonance;
+  const display = document.getElementById('threat-display');
+  const indicators = document.querySelectorAll('.threat-indicator');
+
+  // Default: graceful green when FR data unavailable
+  const indicator = (frData && frData.status) ? frData.status.indicator : 'none';
+
+  if (indicator === 'none' || !indicator) {
+    display.textContent = 'NOMINAL';
+    display.className = 'threat-level nominal';
+    indicators.forEach(i => { i.className = 'threat-indicator green'; i.style.background = ''; i.style.boxShadow = ''; });
+  } else if (indicator === 'minor') {
+    display.textContent = 'ELEVATED';
+    display.className = 'threat-level elevated';
+    indicators.forEach(i => { i.className = 'threat-indicator amber'; i.style.background = ''; i.style.boxShadow = ''; });
+  } else {
+    display.textContent = 'CRITICAL';
+    display.className = 'threat-level critical';
+    indicators.forEach(i => { i.className = 'threat-indicator'; i.style.background = 'var(--red-alert)'; i.style.boxShadow = '0 0 12px rgba(255,59,59,0.6)'; });
+  }
+}
+
+// =============================================================================
+// Apply Incident Feed (merged from all sources)
+// =============================================================================
+let activeFilter = 'all';
+let liveIncidents = [];
+
+function applyIncidentFeed() {
+  liveIncidents = [];
+
+  Object.entries(sourceData).forEach(([sourceKey, data]) => {
+    if (!data || !data.incidents) return;
+    data.incidents.forEach(inc => {
+      const severityMap = { none: 'info', minor: 'warn', major: 'crit', critical: 'crit' };
+      const statusMap = { investigating: 'crit', identified: 'warn', monitoring: 'info', resolved: 'ok', postmortem: 'ok' };
+      const severity = severityMap[inc.impact] || statusMap[inc.status] || 'info';
+
+      // Classify type based on source
+      let type = 'infra';
+      if (sourceKey === 'auth0') type = 'security';
+      else if (sourceKey === 'firstresonance') type = 'customer';
+
+      liveIncidents.push({
+        time: new Date(inc.created_at),
+        severity,
+        type,
+        status: inc.status,
+        name: inc.name,
+        source: SOURCE_LABELS[sourceKey] || sourceKey,
+      });
+    });
+
+    // Also add scheduled maintenances
+    if (data.scheduled_maintenances) {
+      data.scheduled_maintenances.forEach(m => {
+        liveIncidents.push({
+          time: new Date(m.scheduled_for || m.created_at),
+          severity: 'info',
+          type: 'infra',
+          status: m.status,
+          name: m.name,
+          source: SOURCE_LABELS[sourceKey] || sourceKey,
+        });
+      });
+    }
+  });
+
+  // Sort by time descending, limit to 20
+  liveIncidents.sort((a, b) => b.time - a.time);
+  liveIncidents = liveIncidents.slice(0, 20);
+
+  renderFeed();
+}
+
+function renderFeed() {
+  const feedEl = document.getElementById('incident-feed');
+  feedEl.innerHTML = '';
+
+  const filtered = activeFilter === 'all'
+    ? liveIncidents
+    : liveIncidents.filter(i => i.type === activeFilter);
+
+  if (filtered.length === 0) {
+    feedEl.innerHTML = '<div class="incident-item" style="color:var(--text-muted);text-align:center;padding:20px 0;">No active incidents</div>';
+    return;
+  }
+
+  filtered.forEach(i => {
+    const timeStr = i.time.toISOString().slice(11, 16);
+    const dateStr = i.time.toISOString().slice(0, 10);
+    const statusBadge = i.status === 'resolved' ? '(resolved)' : i.status === 'monitoring' ? '(monitoring)' : '';
+
+    feedEl.innerHTML += `
+      <div class="incident-item" data-type="${i.type}">
+        <div class="incident-header">
+          <span class="incident-time">${dateStr} ${timeStr} UTC</span>
+          <span class="severity-badge ${i.severity}">${i.severity.toUpperCase()}</span>
+        </div>
+        <div class="incident-text">${i.name} <span class="src">${statusBadge} — ${i.source}</span></div>
+      </div>
+    `;
+  });
+}
+
+function filterFeed(type) {
+  activeFilter = type;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  renderFeed();
+}
+
+// =============================================================================
+// Initialize & Poll
+// =============================================================================
+loadAllSources();
+setInterval(loadAllSources, 60000);
+
+// Auto-scroll incident feed
+setInterval(() => {
+  const feedEl = document.getElementById('incident-feed');
+  if (feedEl.scrollTop < feedEl.scrollHeight - feedEl.clientHeight) {
+    feedEl.scrollTop += 1;
+  } else {
+    feedEl.scrollTop = 0;
+  }
+}, 150);
+</script>
+</body>
+</html>

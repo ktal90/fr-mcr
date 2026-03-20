@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FR-MCR // CAPABILITIES MATRIX</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #070a0d;
+    --surface: #0d1117;
+    --surface-2: #151b23;
+    --border: #1c2630;
+    --text: #c9d1d9;
+    --text-muted: #6e7681;
+    --fr-green: #00c853;
+    --fr-green-dim: rgba(0,200,83,0.12);
+    --fr-green-glow: #00ff88;
+    --amber: #f0b429;
+    --amber-dim: rgba(240,180,41,0.12);
+    --red-alert: #ff3b3b;
+    --red-alert-dim: rgba(255,59,59,0.1);
+    --cyan: #00d4ff;
+    --cyan-dim: rgba(0,212,255,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .classification-bar {
+    background: var(--surface);
+    border-bottom: 2px solid var(--fr-green);
+    padding: 8px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--fr-green);
+    position: relative;
+    z-index: 10;
+  }
+  .classification-bar .timestamp { color: var(--text-muted); letter-spacing: 1px; font-size: 10px; }
+
+  .watermark {
+    position: fixed;
+    bottom: 52px;
+    right: 20px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(0,200,83,0.2);
+    text-transform: uppercase;
+    z-index: 10;
+  }
+
+  /* Main layout */
+  .main {
+    display: flex;
+    height: calc(100vh - 82px);
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Hex grid panel */
+  .hex-panel {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+  }
+
+  .hex-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    max-width: 900px;
+    width: 100%;
+  }
+
+  /* Offset every other row */
+  .hex-grid .hex-card:nth-child(n+6) {
+    /* second row offset handled by margin */
+  }
+
+  .hex-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hex-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--fr-green);
+    opacity: 0.3;
+    transition: opacity 0.3s;
+  }
+
+  .hex-card:hover {
+    border-color: var(--fr-green);
+    transform: translateY(-2px);
+    box-shadow: 0 0 24px rgba(0,200,83,0.15);
+  }
+  .hex-card:hover::before { opacity: 1; }
+
+  .hex-card.expanded {
+    border-color: var(--fr-green);
+    box-shadow: 0 0 30px rgba(0,200,83,0.2);
+  }
+
+  .hex-icon {
+    height: 36px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--fr-green);
+    opacity: 0.85;
+  }
+  .hex-icon svg { flex-shrink: 0; }
+
+  .sector-badge {
+    display: inline-block;
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-top: 5px;
+    font-weight: 600;
+    border: 1px solid;
+  }
+  .sector-badge.green {
+    color: var(--fr-green);
+    border-color: rgba(0,200,83,0.4);
+    background: rgba(0,200,83,0.07);
+  }
+  .sector-badge.amber {
+    color: var(--amber);
+    border-color: rgba(240,180,41,0.4);
+    background: rgba(240,180,41,0.07);
+  }
+
+  .hex-name {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--fr-green);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+
+  .hex-count {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .hex-count-label {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* Glow intensity based on factory count */
+  .hex-card.glow-1 { box-shadow: inset 0 0 20px rgba(0,200,83,0.03); }
+  .hex-card.glow-2 { box-shadow: inset 0 0 25px rgba(0,200,83,0.05); }
+  .hex-card.glow-3 { box-shadow: inset 0 0 30px rgba(0,200,83,0.08); }
+  .hex-card.glow-4 { box-shadow: inset 0 0 35px rgba(0,200,83,0.12); }
+
+  @keyframes hex-pulse {
+    0%, 100% { box-shadow: inset 0 0 20px rgba(0,200,83,0.05); }
+    50% { box-shadow: inset 0 0 30px rgba(0,200,83,0.12); }
+  }
+  .hex-card.active-mission {
+    animation: hex-pulse 3s ease-in-out infinite;
+  }
+
+  /* Expanded factory list */
+  .hex-factories {
+    display: none;
+    margin-top: 10px;
+    text-align: left;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+  .hex-card.expanded .hex-factories { display: block; }
+
+  .hex-factory-item {
+    font-size: 10px;
+    padding: 3px 0;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+  }
+  .hex-factory-item .fname { color: var(--text); }
+  .hex-factory-item .floc { color: var(--text-muted); font-size: 9px; }
+
+  /* Right sidebar */
+  .stats-panel {
+    flex: 0 0 280px;
+    border-left: 1px solid var(--border);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .panel-header {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--fr-green);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .stat-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--fr-green);
+    text-shadow: 0 0 10px rgba(0,200,83,0.3);
+  }
+  .stat-value small { font-size: 14px; color: var(--text-muted); font-weight: 400; }
+
+  .mission-list {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .mission-item {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(28,38,48,0.5);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .mission-item:last-child { border-bottom: none; }
+  .mission-customer { color: var(--fr-green); font-weight: 600; font-size: 10px; letter-spacing: 0.5px; }
+  .mission-name { color: var(--text); font-family: 'Inter', system-ui, sans-serif; }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .mission-active-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--fr-green);
+    box-shadow: 0 0 6px rgba(0,200,83,0.5);
+    margin-right: 6px;
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  /* Bottom ticker */
+  .ticker-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 0;
+    overflow: hidden;
+    z-index: 10;
+  }
+  @keyframes ticker-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .ticker-content {
+    display: flex;
+    animation: ticker-scroll 40s linear infinite;
+    white-space: nowrap;
+  }
+  .ticker-item {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 0 32px;
+    color: var(--text-muted);
+  }
+  .ticker-item .cust { color: var(--fr-green); font-weight: 600; }
+  .ticker-sep { color: var(--border); padding: 0 8px; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="classification-bar">
+  <span>UNCLASSIFIED // FIRST RESONANCE // ION FACTORY OS</span>
+  <span class="timestamp" id="utc-clock"></span>
+</div>
+
+<div class="main">
+  <!-- Hex Grid -->
+  <div class="hex-panel">
+    <div class="hex-grid" id="hex-grid"></div>
+  </div>
+
+  <!-- Right Sidebar -->
+  <div class="stats-panel">
+    <div class="panel-header">Mission Stats</div>
+
+    <div class="stat-block">
+      <div class="stat-label">Verticals Powered</div>
+      <div class="stat-value">10</div>
+    </div>
+
+    <div class="stat-block">
+      <div class="stat-label">Factories Powered</div>
+      <div class="stat-value">66</div>
+    </div>
+
+    <div class="stat-block">
+      <div class="stat-label">Active Sectors</div>
+      <div class="stat-value">10 <small>sectors</small></div>
+    </div>
+
+    <div class="mission-list">
+      <div class="stat-label" style="margin-bottom:10px">Active Missions</div>
+      <div id="mission-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom ticker -->
+<div class="ticker-bar">
+  <div class="ticker-content" id="ticker"></div>
+</div>
+
+<div class="watermark">FR-MCR // CAPABILITIES MATRIX</div>
+
+<script>
+// UTC Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('utc-clock').textContent =
+    now.toISOString().replace('T', ' // ').slice(0, 22) + ' UTC';
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// SVG icon definitions — monochrome line-art, sized 30x30
+const ICONS = {
+  evtol: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19 L16 13 L27 19"/><path d="M12 13 L10 7 L14 9"/><path d="M20 13 L22 7 L18 9"/><ellipse cx="16" cy="19" rx="3" ry="2"/><path d="M16 21 L16 25"/><line x1="13" y1="25" x2="19" y2="25"/></svg>`,
+  maritime: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20 L25 20 L22 26 L10 26 Z"/><line x1="16" y1="9" x2="16" y2="20"/><path d="M10 14 L16 10 L22 14"/><path d="M4 25 Q10 23 16 25 Q22 27 28 25"/></svg>`,
+  spacemfg: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4 C22 8 23 14 23 18 L16 22 L9 18 C9 14 10 8 16 4Z"/><circle cx="16" cy="13" r="2.5"/><path d="M9 18 L7 25 L16 22"/><path d="M23 18 L25 25 L16 22"/></svg>`,
+  satellite: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 26 L19 13"/><path d="M6 26 A17 17 0 0 1 23 9"/><circle cx="19" cy="13" r="3"/><line x1="19" y1="13" x2="27" y2="5"/><path d="M22 8 L27 5 L28 10"/></svg>`,
+  defense: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3 L28 8 L28 17 C28 23 22 28 16 30 C10 28 4 23 4 17 L4 8 Z"/><path d="M11 16 L14 19 L21 12"/></svg>`,
+  energy: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="3"/><ellipse cx="16" cy="16" rx="11" ry="5"/><ellipse cx="16" cy="16" rx="11" ry="5" transform="rotate(60 16 16)"/><ellipse cx="16" cy="16" rx="11" ry="5" transform="rotate(120 16 16)"/></svg>`,
+  launch: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4 L19 14 L19 22 L16 26 L13 22 L13 14 Z"/><path d="M13 18 L9 26 L13 22"/><path d="M19 18 L23 26 L19 22"/><line x1="7" y1="26" x2="25" y2="26"/></svg>`,
+  robotics: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="12" y="5" width="8" height="7" rx="2"/><circle cx="16" cy="8.5" r="1.5"/><line x1="16" y1="12" x2="16" y2="18"/><line x1="8" y1="15" x2="24" y2="15"/><path d="M8 15 L5 19 L9 21"/><path d="M24 15 L27 19 L23 21"/><line x1="16" y1="18" x2="16" y2="26"/><rect x="13" y="25" width="6" height="3" rx="1"/></svg>`,
+  earthobs: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="11"/><ellipse cx="16" cy="16" rx="5" ry="11"/><line x1="5" y1="16" x2="27" y2="16"/><line x1="7" y1="10" x2="25" y2="10" stroke-width="0.8"/><line x1="7" y1="22" x2="25" y2="22" stroke-width="0.8"/></svg>`,
+  cuas: `<svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="16" r="10"/><circle cx="16" cy="16" r="4"/><line x1="16" y1="4" x2="16" y2="10"/><line x1="16" y1="22" x2="16" y2="28"/><line x1="4" y1="16" x2="10" y2="16"/><line x1="22" y1="16" x2="28" y2="16"/></svg>`,
+};
+
+// Sector badges
+function getSectorBadge(name) {
+  if (name.includes('eVTOL')) return { text: 'CERTIFICATION COMPLETE', cls: 'green' };
+  if (name.includes('Counter-UAS') || name.includes('CUAS')) return { text: 'UPCOMING GROUND TESTING', cls: 'amber' };
+  if (name.includes('Fusion') || name.includes('Energy')) return { text: 'SITE EXPANSION UPCOMING', cls: 'amber' };
+  return null;
+}
+
+// Verticals data — codenames replace real customer names
+const verticals = [
+  {
+    name: "eVTOL / Urban Air Mobility",
+    icon: ICONS.evtol,
+    factories: [
+      { name: "PHOENIX", loc: "Santa Cruz, CA" },
+      { name: "VALKYRIE", loc: "Washington, DC" },
+      { name: "Whisper Aero", loc: "Tennessee" },
+    ],
+    activeMission: true,
+  },
+  {
+    name: "Autonomous Maritime",
+    icon: ICONS.maritime,
+    factories: [
+      { name: "LEVIATHAN", loc: "Austin, TX & Franklin, LA" },
+      { name: "TRITON", loc: "Chula Vista, CA" },
+      { name: "Regent", loc: "North Kingstown, RI" },
+      { name: "Seasats", loc: "US" },
+    ],
+    activeMission: true,
+  },
+  {
+    name: "Space Manufacturing",
+    icon: ICONS.spacemfg,
+    factories: [
+      { name: "CRUCIBLE", loc: "El Segundo, CA" },
+      { name: "Impulse Space", loc: "Redondo Beach, CA" },
+      { name: "Starfish Space", loc: "Kent, WA" },
+      { name: "Orbit Fab", loc: "US" },
+    ],
+    activeMission: true,
+  },
+  {
+    name: "Satellite Comms",
+    icon: ICONS.satellite,
+    factories: [
+      { name: "RELAY", loc: "San Francisco, CA" },
+      { name: "ORBITAL", loc: "Luxembourg" },
+      { name: "Loft Orbital", loc: "San Francisco, CA" },
+      { name: "Lynk Global", loc: "Falls Church, VA" },
+      { name: "K2 Space", loc: "Los Angeles, CA" },
+      { name: "Capella Space", loc: "San Francisco, CA" },
+    ],
+    activeMission: true,
+  },
+  {
+    name: "Defense & Directed Energy",
+    icon: ICONS.defense,
+    factories: [
+      { name: "AEGIS", loc: "Torrance, CA" },
+      { name: "Cambrian Works", loc: "Dayton, OH" },
+      { name: "CHAOS", loc: "US" },
+      { name: "Chariot Defense", loc: "US" },
+      { name: "Agile Space", loc: "US" },
+    ],
+    activeMission: true,
+  },
+  {
+    name: "Fusion & Energy",
+    icon: ICONS.energy,
+    factories: [
+      { name: "PROMETHEUS", loc: "Everett, WA" },
+      { name: "KYMA Batteries", loc: "US" },
+      { name: "Electric Era", loc: "Portland, OR" },
+      { name: "Radiant Industries", loc: "El Segundo, CA" },
+    ],
+    activeMission: true,
+  },
+  {
+    name: "Launch Vehicles",
+    icon: ICONS.launch,
+    factories: [
+      { name: "SOUTHERN CROSS", loc: "Gold Coast, Australia" },
+      { name: "Frontier Aerospace", loc: "US" },
+    ],
+    activeMission: false,
+  },
+  {
+    name: "Robotics & Automation",
+    icon: ICONS.robotics,
+    factories: [
+      { name: "Machina Labs", loc: "Chatsworth, CA" },
+      { name: "Mytra", loc: "San Jose, CA" },
+      { name: "Chef Robotics", loc: "San Francisco, CA" },
+      { name: "Tutor Intelligence", loc: "Boston, MA" },
+      { name: "Salient Motion", loc: "Bay Area, CA" },
+      { name: "Charge Robotics", loc: "Bay Area, CA" },
+    ],
+    activeMission: false,
+  },
+  {
+    name: "Earth Observation",
+    icon: ICONS.earthobs,
+    factories: [
+      { name: "Muon Space", loc: "Mountain View, CA" },
+      { name: "Umbra", loc: "Santa Barbara, CA" },
+      { name: "Skykraft", loc: "Canberra, Australia" },
+      { name: "Astrolab", loc: "US" },
+      { name: "Hydrosat", loc: "US" },
+    ],
+    activeMission: false,
+  },
+  {
+    name: "Counter-UAS / CUAS",
+    icon: ICONS.cuas,
+    factories: [
+      { name: "AEGIS", loc: "Torrance, CA" },
+      { name: "Swarm Aero", loc: "US" },
+    ],
+    activeMission: true,
+  },
+];
+
+// Render hex grid
+const hexGrid = document.getElementById('hex-grid');
+verticals.forEach((v, i) => {
+  const count = v.factories.length;
+  const glowClass = count <= 2 ? 'glow-1' : count <= 3 ? 'glow-2' : count <= 5 ? 'glow-3' : 'glow-4';
+  const missionClass = v.activeMission ? 'active-mission' : '';
+
+  const factoryList = v.factories.map(f =>
+    `<div class="hex-factory-item"><span class="fname">${f.name}</span><span class="floc">${f.loc}</span></div>`
+  ).join('');
+
+  const badge = getSectorBadge(v.name);
+  const badgeHtml = badge ? `<div class="sector-badge ${badge.cls}">${badge.text}</div>` : '';
+
+  hexGrid.innerHTML += `
+    <div class="hex-card ${glowClass} ${missionClass}" onclick="toggleHex(this)" data-index="${i}">
+      <span class="hex-icon">${v.icon}</span>
+      <div class="hex-name">${v.name}</div>
+      <div class="hex-count">${count}</div>
+      <div class="hex-count-label">Factories</div>
+      ${badgeHtml}
+      <div class="hex-factories">${factoryList}</div>
+    </div>
+  `;
+});
+
+function toggleHex(el) {
+  const wasExpanded = el.classList.contains('expanded');
+  document.querySelectorAll('.hex-card').forEach(c => c.classList.remove('expanded'));
+  if (!wasExpanded) el.classList.add('expanded');
+}
+
+// Active missions — codenames
+const missions = [
+  { customer: "PHOENIX", name: "FAA Stage 4 Certification Sprint" },
+  { customer: "LEVIATHAN", name: "Franklin LA Factory Scale-Up" },
+  { customer: "ORBITAL", name: "Eagle-1 Quantum Satellite MFG" },
+  { customer: "CRUCIBLE", name: "In-Space Production Expansion" },
+  { customer: "TRITON", name: "Electric Maritime Production" },
+  { customer: "PROMETHEUS", name: "Fusion Prototype Assembly" },
+  { customer: "AEGIS", name: "Directed Energy Systems Production" },
+  { customer: "SOUTHERN CROSS", name: "Eris-1 Launch Vehicle Assembly" },
+  { customer: "RELAY", name: "MicroGEO Satellite Production" },
+  { customer: "VALKYRIE", name: "SA-2 eVTOL Prototype Build" },
+];
+
+const missionList = document.getElementById('mission-list');
+missions.forEach(m => {
+  missionList.innerHTML += `
+    <div class="mission-item">
+      <span class="mission-active-dot"></span>
+      <span class="mission-customer">${m.customer}</span><br>
+      <span class="mission-name">${m.name}</span>
+    </div>
+  `;
+});
+
+// Ticker — codenames only
+const tickerItems = [
+  { cust: "PHOENIX", mission: "FAA STAGE 4 CERT SPRINT" },
+  { cust: "LEVIATHAN", mission: "FRANKLIN LA FACTORY SCALE-UP" },
+  { cust: "ORBITAL", mission: "EAGLE-1 QUANTUM SAT MFG" },
+  { cust: "CRUCIBLE", mission: "IN-SPACE PRODUCTION EXPANSION" },
+  { cust: "TRITON", mission: "ELECTRIC MARITIME PRODUCTION" },
+  { cust: "PROMETHEUS", mission: "FUSION PROTOTYPE ASSEMBLY" },
+  { cust: "AEGIS", mission: "DIRECTED ENERGY SYSTEMS" },
+  { cust: "SOUTHERN CROSS", mission: "ERIS-1 LAUNCH VEHICLE" },
+  { cust: "RELAY", mission: "MICROGEO SATELLITE PRODUCTION" },
+  { cust: "VALKYRIE", mission: "SA-2 eVTOL PROTOTYPE" },
+];
+
+const tickerEl = document.getElementById('ticker');
+// Duplicate for seamless loop
+const tickerHTML = tickerItems.map(t =>
+  `<span class="ticker-item"><span class="cust">${t.cust}</span> \u2192 ${t.mission}</span>`
+).join('<span class="ticker-sep">|</span>');
+tickerEl.innerHTML = tickerHTML + '<span class="ticker-sep">|</span>' + tickerHTML;
+</script>
+</body>
+</html>

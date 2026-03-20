@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FR-MCR // OPERATIONS COMMAND</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #070a0d;
+    --surface: #0d1117;
+    --surface-2: #151b23;
+    --border: #1c2630;
+    --text: #c9d1d9;
+    --text-muted: #6e7681;
+    --fr-green: #00c853;
+    --fr-green-dim: rgba(0,200,83,0.12);
+    --fr-green-glow: #00ff88;
+    --amber: #f0b429;
+    --amber-dim: rgba(240,180,41,0.12);
+    --red-alert: #ff3b3b;
+    --red-alert-dim: rgba(255,59,59,0.1);
+    --cyan: #00d4ff;
+    --cyan-dim: rgba(0,212,255,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Scan-line overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255,255,255,0.02) 2px,
+      rgba(255,255,255,0.02) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* Grid background */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Classification header */
+  .classification-bar {
+    background: var(--surface);
+    border-bottom: 2px solid var(--fr-green);
+    padding: 8px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--fr-green);
+    position: relative;
+    z-index: 10;
+  }
+  .classification-bar .label { opacity: 0.8; }
+  .classification-bar .timestamp { color: var(--text-muted); letter-spacing: 1px; font-size: 10px; }
+
+  /* Corner watermark */
+  .watermark {
+    position: fixed;
+    bottom: 12px;
+    right: 20px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(0,200,83,0.2);
+    text-transform: uppercase;
+    z-index: 10;
+  }
+
+  /* Main layout */
+  .main {
+    display: flex;
+    height: calc(100vh - 42px);
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Left panel — map */
+  .map-panel {
+    flex: 0 0 60%;
+    padding: 20px;
+    position: relative;
+    border-right: 1px solid var(--border);
+  }
+
+  .panel-header {
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--fr-green);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .panel-header .sub { color: var(--text-muted); letter-spacing: 1px; font-size: 10px; }
+
+  /* World map SVG container */
+  .map-container {
+    width: 100%;
+    height: calc(100% - 40px);
+    position: relative;
+  }
+  .map-container svg { width: 100%; height: 100%; }
+
+  /* Factory dots */
+  .factory-dot {
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .factory-dot:hover .dot-core { r: 6; }
+
+  .dot-core { transition: all 0.3s ease; }
+
+  @keyframes pulse-ring {
+    0% { r: 4; opacity: 0.7; }
+    100% { r: 22; opacity: 0; }
+  }
+  .pulse-ring {
+    animation: pulse-ring 2s ease-out infinite;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: absolute;
+    background: var(--surface-2);
+    border: 1px solid var(--fr-green);
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-size: 11px;
+    line-height: 1.6;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 100;
+    max-width: 260px;
+    box-shadow: 0 0 20px rgba(0,200,83,0.15);
+  }
+  .tooltip.visible { opacity: 1; }
+  .tooltip .tt-name { color: var(--fr-green); font-weight: 600; font-size: 12px; }
+  .tooltip .tt-row { color: var(--text-muted); }
+  .tooltip .tt-row span { color: var(--text); }
+
+  /* Right panel */
+  .data-panel {
+    flex: 0 0 40%;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .card-title {
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  /* Uptime gauge */
+  .uptime-section {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .gauge-ring {
+    width: 110px;
+    height: 110px;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .gauge-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .gauge-bg { fill: none; stroke: var(--border); stroke-width: 6; }
+  .gauge-fill {
+    fill: none;
+    stroke: var(--fr-green);
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 314;
+    stroke-dashoffset: 3.14;
+    filter: drop-shadow(0 0 6px rgba(0,200,83,0.5));
+    transition: stroke-dashoffset 1s ease;
+  }
+  .gauge-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--fr-green);
+    text-shadow: 0 0 10px rgba(0,200,83,0.4);
+  }
+  .gauge-text small { font-size: 11px; font-weight: 400; color: var(--text-muted); }
+  .sparkline-container { flex: 1; }
+  .sparkline-label { font-size: 10px; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* Region bars */
+  .region-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 11px;
+  }
+  .region-bar .label { width: 80px; color: var(--text-muted); text-align: right; font-size: 10px; letter-spacing: 1px; }
+  .region-bar .bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--surface-2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .region-bar .bar-fill {
+    height: 100%;
+    background: var(--fr-green);
+    border-radius: 4px;
+    box-shadow: 0 0 8px rgba(0,200,83,0.3);
+    transition: width 1s ease;
+  }
+  .region-bar .count { width: 24px; font-size: 12px; font-weight: 600; color: var(--fr-green); }
+
+  /* Deployment donut */
+  .deploy-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .donut-chart { width: 90px; height: 90px; flex-shrink: 0; }
+  .donut-chart svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .deploy-legend { flex: 1; }
+  .deploy-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 11px;
+  }
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Activity feed */
+  .feed {
+    max-height: 160px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .feed-item {
+    display: flex;
+    gap: 10px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(28,38,48,0.5);
+    font-size: 11px;
+    align-items: flex-start;
+  }
+  .feed-time { color: var(--text-muted); font-size: 10px; white-space: nowrap; min-width: 48px; }
+  .feed-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  .feed-text { color: var(--text); line-height: 1.4; }
+  .feed-text .highlight { color: var(--fr-green); }
+
+  /* Bottom strip */
+  .bottom-strip {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 10px 32px;
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    z-index: 10;
+  }
+  .strip-stat {
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .strip-stat .num {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--fr-green);
+    text-shadow: 0 0 8px rgba(0,200,83,0.3);
+    display: block;
+    margin-bottom: 2px;
+    letter-spacing: 0;
+  }
+  .strip-stat .lbl { color: var(--text-muted); font-size: 9px; }
+
+  /* Hot-point cluster pulses — 3-ring dramatic expansion */
+  @keyframes hot-pulse-outer {
+    0% { r: 6; opacity: 0.9; }
+    100% { r: 36; opacity: 0; }
+  }
+  @keyframes hot-pulse-mid {
+    0% { r: 5; opacity: 0.7; }
+    100% { r: 28; opacity: 0; }
+  }
+  @keyframes hot-pulse-inner {
+    0% { r: 4; opacity: 0.6; }
+    100% { r: 20; opacity: 0; }
+  }
+  .hot-point-outer { animation: hot-pulse-outer 2s ease-out infinite; }
+  .hot-point-mid   { animation: hot-pulse-mid   2s ease-out infinite; }
+  .hot-point-inner { animation: hot-pulse-inner 2s ease-out infinite; }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="classification-bar">
+  <span class="label">UNCLASSIFIED // FIRST RESONANCE // ION FACTORY OS</span>
+  <span style="display:flex;align-items:center;gap:12px;">
+    <span id="stale-indicator" style="display:none;color:var(--amber);font-size:10px;letter-spacing:2px;animation:pulse-ring 1.5s ease-in-out infinite;">DATA STALE</span>
+    <span class="timestamp" id="utc-clock"></span>
+  </span>
+</div>
+
+<div class="main">
+  <!-- LEFT: Global Factory Map -->
+  <div class="map-panel">
+    <div class="panel-header">
+      <span>Global Factory Operations</span>
+      <span class="sub">LIVE DEPLOYMENT MAP</span>
+    </div>
+    <div class="map-container" id="map-container">
+      <svg id="world-map" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
+        <!-- Simplified world map paths -->
+        <defs>
+          <radialGradient id="dotGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="var(--fr-green-glow)" stop-opacity="0.6"/>
+            <stop offset="100%" stop-color="var(--fr-green)" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="dotGlowAmber" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="var(--amber)" stop-opacity="0.6"/>
+            <stop offset="100%" stop-color="var(--amber)" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+
+        <!-- Lat/Lng grid -->
+        <g id="grid" fill="none" stroke-width="0.5">
+          <!-- Map border -->
+          <rect x="0" y="0" width="1000" height="500" stroke="rgba(0,200,83,0.12)" fill="none" stroke-width="1"/>
+          <!-- Latitude lines (every 30°: 60N=125, 30N=208, 0=291, 30S=374, 60S=430) -->
+          <line x1="0" y1="125" x2="1000" y2="125" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="0" y1="208" x2="1000" y2="208" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="0" y1="291" x2="1000" y2="291" stroke="rgba(0,200,83,0.12)"/><!-- Equator brighter -->
+          <line x1="0" y1="374" x2="1000" y2="374" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="0" y1="430" x2="1000" y2="430" stroke="rgba(0,200,83,0.06)"/>
+          <!-- Longitude lines (every 30°: at x = 83,167,250,333,417,500,583,667,750,833,917) -->
+          <line x1="83"  y1="0" x2="83"  y2="500" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="167" y1="0" x2="167" y2="500" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="250" y1="0" x2="250" y2="500" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="333" y1="0" x2="333" y2="500" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="417" y1="0" x2="417" y2="500" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="500" y1="0" x2="500" y2="500" stroke="rgba(0,200,83,0.08)"/><!-- Prime meridian -->
+          <line x1="583" y1="0" x2="583" y2="500" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="667" y1="0" x2="667" y2="500" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="750" y1="0" x2="750" y2="500" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="833" y1="0" x2="833" y2="500" stroke="rgba(0,200,83,0.06)"/>
+          <line x1="917" y1="0" x2="917" y2="500" stroke="rgba(0,200,83,0.06)"/>
+        </g>
+
+        <!-- Continents — ~40-60pt outlines, recognizable landmasses -->
+        <g id="landmass" fill="rgba(0,200,83,0.05)" stroke="rgba(0,200,83,0.3)" stroke-width="1.5" stroke-linejoin="round">
+          <!-- North America (Alaska bump, Great Lakes region, Florida, Mexico, Central Am.) -->
+          <path d="M 88,95 L 96,82 108,72 118,68 130,65 145,62 160,58 175,55 195,54 215,56 235,58 252,62 265,70 278,80 288,92 292,105 290,118 284,130 278,142 270,152 260,160 248,166 235,174 225,182 215,190 205,196 195,200 185,206 175,214 168,220 162,226 156,222 152,212 155,202 160,194 165,186 162,178 152,170 140,164 128,160 116,154 107,144 100,132 98,120 90,110Z"/>
+          <!-- Greenland -->
+          <path d="M 290,42 L 305,36 322,34 338,38 348,46 350,56 344,66 332,72 318,74 305,70 295,62 288,52Z"/>
+          <!-- South America (Brazil bulge, Patagonia) -->
+          <path d="M 220,252 L 232,246 248,246 262,252 272,262 278,275 280,290 278,308 274,326 268,342 260,356 250,366 240,372 230,372 222,366 216,354 212,338 210,320 212,300 215,282 218,268Z"/>
+          <!-- Europe (Iberian, France, Scandinavia, Italy boot, Balkans) -->
+          <path d="M 438,72 L 448,65 460,62 472,60 484,58 495,62 504,70 510,80 514,90 512,100 508,108 500,114 490,118 480,116 472,110 464,106 456,100 448,96 440,90 435,82Z"/>
+          <!-- Scandinavian peninsula -->
+          <path d="M 480,58 L 490,50 500,46 510,48 518,56 516,66 508,72 498,74 488,70 481,63Z"/>
+          <!-- Great Britain -->
+          <path d="M 432,72 L 440,66 448,68 450,76 445,84 436,86 430,80Z"/>
+          <!-- Italy boot -->
+          <path d="M 476,108 L 482,112 485,122 482,134 477,140 470,142 466,134 468,122 472,114Z"/>
+          <!-- Africa (Horn, Madagascar) -->
+          <path d="M 448,152 L 464,148 480,150 494,158 504,170 510,186 512,204 510,222 506,240 500,256 492,268 482,276 470,282 458,280 448,272 442,258 438,240 435,220 434,200 436,180 440,164Z"/>
+          <!-- Horn of Africa -->
+          <path d="M 510,198 L 520,192 528,196 530,206 524,212 514,210Z"/>
+          <!-- Madagascar -->
+          <path d="M 520,254 L 526,248 532,250 534,260 530,270 522,272 516,264Z"/>
+          <!-- Asia (Arabia, Korean pen., Kamchatka) -->
+          <path d="M 512,58 L 540,52 568,48 600,48 635,52 668,58 700,66 732,76 758,88 775,100 782,114 780,128 774,140 762,148 748,150 732,148 716,144 698,138 678,132 658,126 638,120 618,114 600,108 582,102 562,96 544,90 526,82 516,70Z"/>
+          <!-- Arabian peninsula -->
+          <path d="M 552,130 L 562,126 572,130 578,140 578,154 572,164 560,168 550,160 546,148 548,136Z"/>
+          <!-- Indian subcontinent -->
+          <path d="M 614,136 L 628,132 640,138 648,150 652,166 648,182 638,194 626,198 614,192 608,178 608,162 610,148Z"/>
+          <!-- Kamchatka -->
+          <path d="M 820,96 L 828,90 836,94 836,106 830,116 820,118 814,110 814,100Z"/>
+          <!-- Korean peninsula -->
+          <path d="M 766,112 L 774,108 780,114 778,124 770,130 762,126 762,116Z"/>
+          <!-- Japan (2 islands) -->
+          <path d="M 790,104 L 798,98 806,100 808,110 802,118 794,116 788,110Z"/>
+          <path d="M 808,118 L 816,114 822,118 820,126 812,128 806,124Z"/>
+          <!-- SE Asia (Indochina peninsula) -->
+          <path d="M 702,140 L 716,136 728,140 736,150 736,164 730,174 720,180 710,176 704,164 702,152Z"/>
+          <!-- Australia (realistic coastline + Tasmania) -->
+          <path d="M 756,274 L 774,268 792,268 810,272 824,282 832,296 832,312 826,326 814,336 800,342 784,344 768,340 754,330 746,316 744,300 748,286Z"/>
+          <!-- Tasmania -->
+          <path d="M 782,350 L 790,346 796,350 794,360 786,362 780,356Z"/>
+          <!-- New Zealand (2 islands, simplified) -->
+          <path d="M 880,330 L 886,322 892,326 890,338 882,342Z"/>
+          <path d="M 884,344 L 892,338 898,342 896,354 886,358Z"/>
+        </g>
+
+        <!-- Hot-point cluster rings (behind factory dots) -->
+        <g id="hot-points"></g>
+        <!-- Factory location dots will be added by JS -->
+        <g id="factory-dots"></g>
+      </svg>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Deployment Pulse -->
+  <div class="data-panel">
+    <!-- Uptime -->
+    <div class="card">
+      <div class="card-title">Platform Uptime — 30 Day</div>
+      <div class="uptime-section">
+        <div class="gauge-ring">
+          <svg viewBox="0 0 110 110">
+            <circle class="gauge-bg" cx="55" cy="55" r="50"/>
+            <circle class="gauge-fill" cx="55" cy="55" r="50"/>
+          </svg>
+          <div class="gauge-text">99.9%<br><small>UPTIME</small></div>
+        </div>
+        <div class="sparkline-container">
+          <div class="sparkline-label">30-day availability</div>
+          <svg id="sparkline" viewBox="0 0 200 50" style="width:100%;height:50px;">
+            <polyline id="spark-line" fill="none" stroke="var(--fr-green)" stroke-width="1.5" opacity="0.8"/>
+            <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--fr-green)" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="var(--fr-green)" stop-opacity="0"/>
+            </linearGradient>
+            <polygon id="spark-area" fill="url(#sparkGrad)"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Regions -->
+    <div class="card">
+      <div class="card-title">Active Regions</div>
+      <div id="region-bars"></div>
+    </div>
+
+    <!-- Deployment Types -->
+    <div class="card">
+      <div class="card-title">Deployment Types</div>
+      <div class="deploy-row">
+        <div class="donut-chart">
+          <svg viewBox="0 0 100 100">
+            <!-- Background ring -->
+            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--border)" stroke-width="10"/>
+            <!-- GovCloud: 35/66 = 53% → arc 133 of 251 -->
+            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--cyan)" stroke-width="10"
+              stroke-dasharray="133 251" stroke-dashoffset="0"
+              filter="drop-shadow(0 0 5px rgba(0,212,255,0.5))"/>
+            <!-- Cloud: 28/66 = 42% → arc 107, starts at 133 → offset 118 -->
+            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--fr-green)" stroke-width="10"
+              stroke-dasharray="107 251" stroke-dashoffset="118"
+              filter="drop-shadow(0 0 4px rgba(0,200,83,0.4))"/>
+            <!-- AUS: 2/66 = 3% → arc 8, starts at 240 → offset 11 -->
+            <circle cx="50" cy="50" r="40" fill="none" stroke="var(--amber)" stroke-width="10"
+              stroke-dasharray="8 251" stroke-dashoffset="11"/>
+            <!-- Hybrid: 1/66 = 1.5% → arc 4, starts at 248 → offset 3 -->
+            <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(200,200,200,0.35)" stroke-width="10"
+              stroke-dasharray="4 251" stroke-dashoffset="3"/>
+          </svg>
+        </div>
+        <div class="deploy-legend">
+          <div class="deploy-legend-item"><div class="legend-dot" style="background:var(--cyan)"></div><span>GovCloud <strong style="color:var(--cyan)">35</strong></span></div>
+          <div class="deploy-legend-item"><div class="legend-dot" style="background:var(--fr-green)"></div><span>Cloud <strong style="color:var(--fr-green)">28</strong></span></div>
+          <div class="deploy-legend-item"><div class="legend-dot" style="background:var(--amber)"></div><span>AUS <strong style="color:var(--amber)">2</strong></span></div>
+          <div class="deploy-legend-item"><div class="legend-dot" style="background:rgba(200,200,200,0.35)"></div><span>Hybrid <strong style="color:var(--text-muted)">1</strong></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Activity Feed -->
+    <div class="card" style="flex:1;min-height:0;">
+      <div class="card-title">Live Activity Feed</div>
+      <div class="feed" id="activity-feed"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom strip -->
+<div class="bottom-strip">
+  <div class="strip-stat"><span class="num">66</span><span class="lbl">Factories Powered</span></div>
+  <div class="strip-stat"><span class="num">5</span><span class="lbl">Continents</span></div>
+  <div class="strip-stat"><span class="num">22</span><span class="lbl">Active Regions</span></div>
+  <div class="strip-stat"><span class="num">99.9%</span><span class="lbl">Platform Uptime</span></div>
+  <div class="strip-stat"><span class="num">10</span><span class="lbl">Sectors</span></div>
+</div>
+
+<div class="watermark">FR-MCR // OPERATIONS COMMAND</div>
+
+<script>
+// =============================================================================
+// UTC Clock
+// =============================================================================
+function updateClock() {
+  const now = new Date();
+  document.getElementById('utc-clock').textContent =
+    now.toISOString().replace('T', ' // ').slice(0, 22) + ' UTC';
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// =============================================================================
+// Statuspage.io Live Data Loader (shared pattern with threat.html)
+// =============================================================================
+const SOURCES = {
+  firstresonance: 'https://status.firstresonance.io/api/v2/summary.json',
+  auth0:          'https://auth0.statuspage.io/api/v2/summary.json',
+  snowflake:      'https://status.snowflake.com/api/v2/summary.json',
+  datadog:        'https://status.datadoghq.com/api/v2/summary.json',
+  incidentio:     'https://status.incident.io/api/v2/summary.json',
+};
+
+const SOURCE_LABELS = {
+  firstresonance: 'Application',
+  auth0: 'Authentication',
+  snowflake: 'Data Warehouse',
+  datadog: 'Monitoring',
+  incidentio: 'Incident Mgmt',
+};
+
+// Regional degradation mapping — which FR status page components map to which regions
+const REGION_COMPONENT_MAP = {
+  'US WEST': (c) => c.name.toLowerCase().includes('us-west') || c.name.includes('US West'),
+  'US EAST': (c) => c.name.toLowerCase().includes('us-east') || c.name.includes('US East'),
+  'EUROPE':  (c) => c.name.toLowerCase().includes('eu') || c.name.includes('Frankfurt') || c.name.toLowerCase().includes('europe'),
+};
+
+let sourceData = {};
+let regionalStatus = {}; // { 'US WEST': 'operational', ... }
+
+async function loadAllSources() {
+  const entries = Object.entries(SOURCES);
+  const results = await Promise.allSettled(
+    entries.map(([key, url]) => fetch(url).then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    }))
+  );
+
+  let anySuccess = false;
+  results.forEach((result, i) => {
+    const key = entries[i][0];
+    if (result.status === 'fulfilled') {
+      sourceData[key] = result.value;
+      anySuccess = true;
+    }
+  });
+
+  // Stale indicator
+  const staleEl = document.getElementById('stale-indicator');
+  if (!anySuccess) {
+    staleEl.style.display = 'inline';
+  } else {
+    staleEl.style.display = 'none';
+  }
+
+  // Compute regional status from FR components
+  computeRegionalStatus();
+  applyUptimeGauge();
+  applyActivityFeed();
+  applyFactoryDotColors();
+}
+
+function computeRegionalStatus() {
+  const frData = sourceData.firstresonance;
+  if (!frData || !frData.components) return;
+
+  Object.entries(REGION_COMPONENT_MAP).forEach(([region, filter]) => {
+    const matched = frData.components.filter(filter);
+    if (matched.length > 0) {
+      const statuses = matched.map(c => c.status);
+      const priority = ['major_outage', 'partial_outage', 'degraded_performance', 'operational'];
+      for (const p of priority) {
+        if (statuses.includes(p)) { regionalStatus[region] = p; return; }
+      }
+    }
+    regionalStatus[region] = 'operational';
+  });
+}
+
+// =============================================================================
+// Factory data
+// =============================================================================
+function geoToSvg(lat, lng) {
+  const x = (lng + 180) / 360 * 1000;
+  const latRad = lat * Math.PI / 180;
+  const mercN = Math.log(Math.tan(Math.PI/4 + latRad/2));
+  const y = 250 - (mercN / Math.PI * 250);
+  return { x: Math.max(10, Math.min(990, x)), y: Math.max(10, Math.min(490, y)) };
+}
+
+const factories = [
+  { name: "Saronic", location: "Austin, TX & Franklin, LA", sector: "Autonomous Maritime", deploy: "GovCloud", lat: 30.27, lng: -97.74, status: "operational", size: 5, region: "US SOUTH" },
+  { name: "Joby Aviation", location: "Santa Cruz, CA", sector: "eVTOL", deploy: "Cloud", lat: 36.97, lng: -122.03, status: "operational", size: 6, region: "US WEST" },
+  { name: "Astranis", location: "San Francisco, CA", sector: "Satellite Comms", deploy: "Cloud", lat: 37.77, lng: -122.42, status: "operational", size: 4, region: "US WEST" },
+  { name: "Varda", location: "El Segundo, CA", sector: "Space Manufacturing", deploy: "GovCloud", lat: 33.92, lng: -118.41, status: "operational", size: 4, region: "US WEST" },
+  { name: "Supernal", location: "Washington, DC", sector: "eVTOL (Hyundai)", deploy: "Cloud", lat: 38.91, lng: -77.04, status: "operational", size: 4, region: "US EAST" },
+  { name: "Helion Energy", location: "Everett, WA", sector: "Fusion Energy", deploy: "Cloud", lat: 47.98, lng: -122.20, status: "operational", size: 5, region: "US WEST" },
+  { name: "Gilmour Space", location: "Gold Coast, Australia", sector: "Launch Vehicles", deploy: "Cloud", lat: -28.02, lng: 153.43, status: "operational", size: 3, region: "OCEANIA" },
+  { name: "Impulse Space", location: "Redondo Beach, CA", sector: "In-Space Transport", deploy: "Cloud", lat: 33.85, lng: -118.39, status: "operational", size: 3, region: "US WEST" },
+  { name: "Beehive Industries", location: "Knoxville, TN", sector: "Aerospace/Additive", deploy: "Cloud", lat: 35.96, lng: -83.92, status: "operational", size: 3, region: "US EAST" },
+  { name: "Arc Boats", location: "Chula Vista, CA", sector: "Electric Maritime", deploy: "Cloud", lat: 32.64, lng: -117.08, status: "attention", size: 3, region: "US WEST" },
+  { name: "Tendeg", location: "Louisville, CO", sector: "Deployable Space Structures", deploy: "Cloud", lat: 39.98, lng: -105.13, status: "operational", size: 3, region: "US WEST" },
+  { name: "Loft Orbital", location: "San Francisco, CA", sector: "Satellite Hosting", deploy: "Cloud", lat: 37.80, lng: -122.40, status: "operational", size: 2, region: "US WEST" },
+  { name: "K2 Space", location: "Los Angeles, CA", sector: "Large Satellites", deploy: "Cloud", lat: 34.05, lng: -118.24, status: "operational", size: 2, region: "US WEST" },
+  { name: "Capella Space", location: "San Francisco, CA", sector: "SAR Satellites", deploy: "GovCloud", lat: 37.75, lng: -122.38, status: "operational", size: 3, region: "US WEST" },
+  { name: "SES Satellites", location: "Luxembourg, EU", sector: "Satellite Comms", deploy: "Cloud", lat: 49.61, lng: 6.13, status: "operational", size: 3, region: "EUROPE" },
+  { name: "Lynk Global", location: "Falls Church, VA", sector: "Space Telecom", deploy: "Cloud", lat: 38.88, lng: -77.17, status: "operational", size: 2, region: "US EAST" },
+  { name: "Regent", location: "North Kingstown, RI", sector: "Maritime/Seaglider", deploy: "Cloud", lat: 41.55, lng: -71.46, status: "operational", size: 2, region: "US EAST" },
+  { name: "Mytra", location: "San Jose, CA", sector: "Logistics Robotics", deploy: "Cloud", lat: 37.34, lng: -121.89, status: "operational", size: 2, region: "US WEST" },
+  { name: "Machina Labs", location: "Chatsworth, CA", sector: "Robotic Manufacturing", deploy: "Cloud", lat: 34.26, lng: -118.60, status: "operational", size: 2, region: "US WEST" },
+  { name: "Starfish Space", location: "Kent, WA", sector: "Orbital Servicing", deploy: "Cloud", lat: 47.38, lng: -122.23, status: "operational", size: 2, region: "US WEST" },
+  { name: "Epirus", location: "Torrance, CA", sector: "Directed Energy / CUAS", deploy: "GovCloud", lat: 33.84, lng: -118.34, status: "operational", size: 3, region: "US WEST" },
+  { name: "Radiant Industries", location: "El Segundo, CA", sector: "Portable Nuclear Reactors", deploy: "Cloud", lat: 33.90, lng: -118.39, status: "operational", size: 2, region: "US WEST" },
+  { name: "Muon Space", location: "Mountain View, CA", sector: "Earth Observation", deploy: "Cloud", lat: 37.39, lng: -122.08, status: "operational", size: 2, region: "US WEST" },
+  { name: "Umbra", location: "Santa Barbara, CA", sector: "SAR/Earth Obs", deploy: "Cloud", lat: 34.42, lng: -119.70, status: "operational", size: 2, region: "US WEST" },
+  { name: "Skykraft", location: "Canberra, Australia", sector: "Aerospace/ATM", deploy: "Cloud", lat: -35.28, lng: 149.13, status: "operational", size: 2, region: "OCEANIA" },
+  { name: "Cambrian Works", location: "Dayton, OH", sector: "Defense", deploy: "GovCloud", lat: 39.76, lng: -84.19, status: "operational", size: 1, region: "US CENTRAL" },
+  { name: "CHAOS", location: "Unknown, US", sector: "Defense", deploy: "GovCloud", lat: 38.0, lng: -97.0, status: "operational", size: 1, region: "US CENTRAL" },
+  { name: "Chariot Defense", location: "US", sector: "Defense", deploy: "GovCloud", lat: 39.0, lng: -95.0, status: "operational", size: 1, region: "US CENTRAL" },
+  { name: "Swarm Aero", location: "US", sector: "Counter-UAS", deploy: "Cloud", lat: 34.0, lng: -117.5, status: "operational", size: 1, region: "US WEST" },
+  { name: "Chef Robotics", location: "San Francisco, CA", sector: "Robotics/Food", deploy: "Cloud", lat: 37.76, lng: -122.44, status: "operational", size: 1, region: "US WEST" },
+  { name: "Tutor Intelligence", location: "US", sector: "Robotics/AI", deploy: "Cloud", lat: 42.36, lng: -71.06, status: "operational", size: 1, region: "US EAST" },
+  { name: "Salient Motion", location: "US", sector: "Robotics", deploy: "Cloud", lat: 37.5, lng: -122.2, status: "operational", size: 1, region: "US WEST" },
+  { name: "Frontier Aerospace", location: "US", sector: "Launch Vehicles", deploy: "Cloud", lat: 34.1, lng: -118.1, status: "operational", size: 1, region: "US WEST" },
+  { name: "KYMA Batteries", location: "US", sector: "Energy/Batteries", deploy: "Cloud", lat: 37.4, lng: -122.1, status: "operational", size: 1, region: "US WEST" },
+  { name: "Electric Era", location: "US", sector: "Energy", deploy: "Cloud", lat: 45.52, lng: -122.68, status: "operational", size: 1, region: "US WEST" },
+  { name: "Whisper Aero", location: "US", sector: "Aerospace/eVTOL", deploy: "Cloud", lat: 35.8, lng: -86.0, status: "operational", size: 1, region: "US SOUTH" },
+  { name: "Solestial", location: "Tempe, AZ", sector: "Aerospace/Solar", deploy: "Cloud", lat: 33.43, lng: -111.94, status: "operational", size: 1, region: "US WEST" },
+  { name: "Charge Robotics", location: "US", sector: "Solar Robotics", deploy: "Cloud", lat: 37.55, lng: -122.3, status: "operational", size: 1, region: "US WEST" },
+];
+
+// =============================================================================
+// Hot-Point Cluster Markers — Austin TX, LA, Bay Area
+// =============================================================================
+const hotPointsGroup = document.getElementById('hot-points');
+const hotClusters = [
+  { lat: 30.27, lng: -97.74, delay: 0 },    // Austin, TX — Saronic hub
+  { lat: 33.9,  lng: -118.4, delay: 0.7 },  // Los Angeles cluster
+  { lat: 37.5,  lng: -122.2, delay: 1.4 },  // Bay Area cluster
+];
+hotClusters.forEach(hp => {
+  const pos = geoToSvg(hp.lat, hp.lng);
+
+  // Static glow circle (always visible background)
+  const staticGlow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  staticGlow.setAttribute('cx', pos.x); staticGlow.setAttribute('cy', pos.y);
+  staticGlow.setAttribute('r', '8');
+  staticGlow.setAttribute('fill', 'rgba(0,255,136,0.12)');
+  staticGlow.setAttribute('stroke', 'none');
+  hotPointsGroup.appendChild(staticGlow);
+
+  const outer = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  outer.classList.add('hot-point-outer');
+  outer.setAttribute('cx', pos.x); outer.setAttribute('cy', pos.y);
+  outer.setAttribute('r', '6'); outer.setAttribute('fill', 'none');
+  outer.setAttribute('stroke', 'var(--fr-green-glow)'); outer.setAttribute('stroke-width', '2');
+  outer.style.animationDelay = `${hp.delay}s`;
+
+  const mid = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  mid.classList.add('hot-point-mid');
+  mid.setAttribute('cx', pos.x); mid.setAttribute('cy', pos.y);
+  mid.setAttribute('r', '5'); mid.setAttribute('fill', 'none');
+  mid.setAttribute('stroke', 'var(--fr-green-glow)'); mid.setAttribute('stroke-width', '1.5');
+  mid.style.animationDelay = `${hp.delay + 0.33}s`;
+
+  const inner = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  inner.classList.add('hot-point-inner');
+  inner.setAttribute('cx', pos.x); inner.setAttribute('cy', pos.y);
+  inner.setAttribute('r', '4'); inner.setAttribute('fill', 'none');
+  inner.setAttribute('stroke', 'var(--fr-green-glow)'); inner.setAttribute('stroke-width', '1.5');
+  inner.style.animationDelay = `${hp.delay + 0.66}s`;
+
+  hotPointsGroup.appendChild(outer);
+  hotPointsGroup.appendChild(mid);
+  hotPointsGroup.appendChild(inner);
+});
+
+// =============================================================================
+// Render factory dots (initial render with base status)
+// =============================================================================
+const dotsGroup = document.getElementById('factory-dots');
+const tooltip = document.getElementById('tooltip');
+const mapContainer = document.getElementById('map-container');
+const factoryElements = []; // Store references for live color updates
+
+factories.forEach((f, i) => {
+  const pos = geoToSvg(f.lat, f.lng);
+  const color = f.status === 'operational' ? 'var(--fr-green)' : f.status === 'attention' ? 'var(--amber)' : 'var(--red-alert)';
+  const glowColor = f.status === 'operational' ? 'rgba(0,200,83,0.3)' : f.status === 'attention' ? 'rgba(240,180,41,0.3)' : 'rgba(255,59,59,0.3)';
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.classList.add('factory-dot');
+  g.setAttribute('data-index', i);
+
+  const glow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  glow.setAttribute('cx', pos.x);
+  glow.setAttribute('cy', pos.y);
+  glow.setAttribute('r', 12 + f.size * 1.5);
+  glow.setAttribute('fill', glowColor);
+  glow.setAttribute('opacity', '0.3');
+
+  const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  pulse.classList.add('pulse-ring');
+  pulse.setAttribute('cx', pos.x);
+  pulse.setAttribute('cy', pos.y);
+  pulse.setAttribute('r', 4);
+  pulse.setAttribute('fill', 'none');
+  pulse.setAttribute('stroke', color);
+  pulse.setAttribute('stroke-width', '1.5');
+  pulse.style.animationDelay = `${(i * 0.3) % 2.5}s`;
+
+  const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  core.classList.add('dot-core');
+  core.setAttribute('cx', pos.x);
+  core.setAttribute('cy', pos.y);
+  core.setAttribute('r', 2.5 + f.size * 0.6);
+  core.setAttribute('fill', color);
+  core.style.filter = `drop-shadow(0 0 4px ${glowColor})`;
+
+  g.appendChild(glow);
+  g.appendChild(pulse);
+  g.appendChild(core);
+  dotsGroup.appendChild(g);
+
+  factoryElements.push({ g, glow, pulse, core, factory: f, pos });
+
+  g.addEventListener('mouseenter', (e) => {
+    const rect = mapContainer.getBoundingClientRect();
+    const svgRect = document.getElementById('world-map').getBoundingClientRect();
+    const scaleX = svgRect.width / 1000;
+    const scaleY = svgRect.height / 500;
+    const tooltipX = svgRect.left - rect.left + pos.x * scaleX + 15;
+    const tooltipY = svgRect.top - rect.top + pos.y * scaleY - 10;
+
+    // Use live effective status
+    const effectiveStatus = getEffectiveStatus(f);
+    const dotColor = effectiveStatus === 'operational' ? 'var(--fr-green)' : effectiveStatus === 'degraded' ? 'var(--amber)' : 'var(--red-alert)';
+
+    tooltip.innerHTML = `
+      <div class="tt-name">${f.name}</div>
+      <div class="tt-row">Location: <span>${f.location}</span></div>
+      <div class="tt-row">Sector: <span>${f.sector}</span></div>
+      <div class="tt-row">Deployment: <span>${f.deploy}</span></div>
+      <div class="tt-row">Status: <span style="color:${dotColor}">${effectiveStatus.toUpperCase()}</span></div>
+    `;
+    tooltip.style.left = tooltipX + 'px';
+    tooltip.style.top = tooltipY + 'px';
+    tooltip.classList.add('visible');
+  });
+
+  g.addEventListener('mouseleave', () => {
+    tooltip.classList.remove('visible');
+  });
+});
+
+// =============================================================================
+// Pipeline prospect dots — gray, static, no pulse
+// =============================================================================
+const pipelineCompanies = [
+  // Core pipeline (pipeline-dashboard.md)
+  { name: "CP Industries",           location: "McKeesport, PA",         sector: "Industrial Mfg",       lat: 40.34, lng: -79.86 },
+  { name: "Blue Marble Comms",       location: "Bethesda, MD",           sector: "Satellite Comms",      lat: 38.98, lng: -77.10 },
+  { name: "Fortastra",               location: "San Jose, CA",           sector: "Energy",               lat: 37.38, lng: -121.98 },
+  { name: "DoorDash Labs",           location: "San Francisco, CA",      sector: "Logistics Robotics",   lat: 37.78, lng: -122.40 },
+  { name: "Reinhold Industries",     location: "Denver, CO",             sector: "Defense Mfg",          lat: 39.73, lng: -104.98 },
+  { name: "Fourier",                 location: "Shanghai, China",        sector: "Humanoid Robotics",    lat: 31.23, lng: 121.47 },
+  { name: "Inversion Space",         location: "Los Angeles, CA",        sector: "Space Re-entry",       lat: 34.02, lng: -118.15 },
+  { name: "Hubble Network",          location: "Kirkland, WA",           sector: "Satellite Comms",      lat: 47.68, lng: -122.20 },
+  { name: "Aeon Industrial",         location: "Detroit, MI",            sector: "Industrial Mfg",       lat: 42.38, lng: -83.10 },
+  { name: "OpenStar Technologies",   location: "San Diego, CA",          sector: "Space/Energy",         lat: 32.72, lng: -117.15 },
+  { name: "Observable Space",        location: "Bay Area, CA",           sector: "Earth Observation",    lat: 37.55, lng: -122.05 },
+  { name: "Thea Energy",             location: "Princeton, NJ",          sector: "Fusion Energy",        lat: 40.35, lng: -74.66 },
+  { name: "Harmattan AI",            location: "Los Angeles, CA",        sector: "AI Manufacturing",     lat: 34.12, lng: -118.25 },
+  { name: "Applied Atomics",         location: "Phoenix, AZ",            sector: "Nuclear Tech",         lat: 33.45, lng: -111.83 },
+  // Additional pipeline-state.md deals
+  { name: "Orbitworks",              location: "Amsterdam, Netherlands", sector: "Small Satellites",     lat: 52.37, lng:   4.90 },
+  { name: "Space Inventor",          location: "Aalborg, Denmark",       sector: "Small Satellites",     lat: 57.05, lng:   9.92 },
+  { name: "VATN Systems",            location: "Oslo, Norway",           sector: "Defense",              lat: 59.91, lng:  10.75 },
+  { name: "Blue Canyon Tech",        location: "Longmont, CO",           sector: "Satellite Buses",      lat: 40.22, lng: -105.10 },
+  { name: "Icarus",                  location: "Los Angeles, CA",        sector: "Aerospace",            lat: 33.84, lng: -118.34 },
+  { name: "Woven Planet",            location: "Tokyo, Japan",           sector: "Autonomous Vehicles",  lat: 35.65, lng: 139.75 },
+  { name: "HeadSpin",                location: "Palo Alto, CA",          sector: "Tech/QA",              lat: 37.44, lng: -122.15 },
+  { name: "Archangel Lightworks",    location: "Arlington, VA",          sector: "Defense",              lat: 38.89, lng: -77.08 },
+  { name: "VENTURI",                 location: "Monaco",                 sector: "Electric Vehicles",    lat: 43.73, lng:   7.42 },
+  { name: "Saildrone",               location: "Alameda, CA",            sector: "Ocean Drones",         lat: 37.77, lng: -122.25 },
+  { name: "Collaborative Robotics",  location: "Santa Clara, CA",        sector: "Robotics",             lat: 37.35, lng: -121.90 },
+  { name: "Radian Magnetics",        location: "Chatsworth, CA",         sector: "Magnetics",            lat: 34.26, lng: -118.58 },
+  { name: "Turion Space",            location: "El Segundo, CA",         sector: "Space Servicing",      lat: 33.88, lng: -118.37 },
+  { name: "Xometry",                 location: "Gaithersburg, MD",       sector: "Parts Marketplace",    lat: 39.14, lng: -77.21 },
+  { name: "Aurora",                  location: "Pittsburgh, PA",         sector: "Autonomous Vehicles",  lat: 40.44, lng: -79.99 },
+  { name: "Princess Yachts",         location: "Plymouth, UK",           sector: "Marine Mfg",           lat: 50.37, lng:  -4.14 },
+  { name: "Boom Supersonic",         location: "Centennial, CO",         sector: "Supersonic Aviation",  lat: 39.56, lng: -104.87 },
+  { name: "Astrolab",                location: "El Segundo, CA",         sector: "Space Robotics",       lat: 33.93, lng: -118.45 },
+  { name: "Rigetti Computing",       location: "Berkeley, CA",           sector: "Quantum Computing",    lat: 37.87, lng: -122.27 },
+  { name: "Safran Federal",          location: "Fairfax, VA",            sector: "Aerospace Defense",    lat: 38.84, lng: -77.31 },
+  { name: "SubSea Craft",            location: "Kristiansand, Norway",   sector: "Subsea/Maritime",      lat: 58.15, lng:   7.99 },
+  { name: "SYOS Aerospace",          location: "Los Angeles, CA",        sector: "Aerospace",            lat: 34.24, lng: -118.27 },
+  { name: "Newspace Systems",        location: "Cape Town, South Africa",sector: "Satellite Components", lat: -33.92, lng: 18.42 },
+  { name: "ASCO",                    location: "Zaventem, Belgium",      sector: "Aerospace Structures", lat: 50.88, lng:   4.45 },
+  { name: "Abbott",                  location: "Abbott Park, IL",        sector: "MedTech/Mfg",          lat: 42.18, lng: -87.87 },
+  { name: "Faraday Future",          location: "Chino, CA",              sector: "Electric Vehicles",    lat: 34.02, lng: -117.69 },
+  { name: "Kraken Technology",       location: "Halifax, Canada",        sector: "Underwater Robotics",  lat: 44.65, lng: -63.58 },
+  { name: "PCC Rollmet",             location: "Santa Ana, CA",          sector: "Precision Castings",   lat: 33.75, lng: -117.87 },
+  { name: "Corovan Moving",          location: "San Jose, CA",           sector: "Logistics",            lat: 37.32, lng: -121.82 },
+];
+
+const pipelineGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+pipelineGroup.setAttribute('id', 'pipeline-dots');
+// Insert behind factory dots
+dotsGroup.parentNode.insertBefore(pipelineGroup, dotsGroup);
+
+pipelineCompanies.forEach(p => {
+  const pos = geoToSvg(p.lat, p.lng);
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.style.cursor = 'pointer';
+
+  const glow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  glow.setAttribute('cx', pos.x); glow.setAttribute('cy', pos.y);
+  glow.setAttribute('r', '7'); glow.setAttribute('fill', 'rgba(150,170,190,0.08)');
+
+  const core = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  core.setAttribute('cx', pos.x); core.setAttribute('cy', pos.y);
+  core.setAttribute('r', '2.5');
+  core.setAttribute('fill', 'rgba(160,180,200,0.55)');
+  core.setAttribute('stroke', 'rgba(180,200,220,0.4)');
+  core.setAttribute('stroke-width', '0.8');
+
+  g.appendChild(glow);
+  g.appendChild(core);
+  pipelineGroup.appendChild(g);
+
+  g.addEventListener('mouseenter', () => {
+    core.setAttribute('fill', 'rgba(200,220,240,0.85)');
+    const rect = mapContainer.getBoundingClientRect();
+    const svgRect = document.getElementById('world-map').getBoundingClientRect();
+    const scaleX = svgRect.width / 1000;
+    const scaleY = svgRect.height / 500;
+    tooltip.innerHTML = `
+      <div class="tt-name" style="color:rgba(180,200,220,0.9)">${p.name}</div>
+      <div class="tt-row">Location: <span>${p.location}</span></div>
+      <div class="tt-row">Sector: <span>${p.sector}</span></div>
+      <div class="tt-row" style="color:var(--amber);font-size:10px;letter-spacing:1px">PIPELINE PROSPECT</div>
+    `;
+    tooltip.style.left = (svgRect.left - rect.left + pos.x * scaleX + 15) + 'px';
+    tooltip.style.top  = (svgRect.top  - rect.top  + pos.y * scaleY - 10) + 'px';
+    tooltip.classList.add('visible');
+  });
+  g.addEventListener('mouseleave', () => {
+    core.setAttribute('fill', 'rgba(160,180,200,0.55)');
+    tooltip.classList.remove('visible');
+  });
+});
+
+function getEffectiveStatus(factory) {
+  // If factory itself has attention status, keep it
+  if (factory.status === 'attention') return 'degraded';
+  // Check if this factory's region is degraded
+  const regionStat = regionalStatus[factory.region];
+  if (regionStat === 'degraded_performance') return 'degraded';
+  if (regionStat === 'partial_outage' || regionStat === 'major_outage') return 'outage';
+  return factory.status;
+}
+
+// =============================================================================
+// Apply factory dot colors based on regional status
+// =============================================================================
+function applyFactoryDotColors() {
+  factoryElements.forEach(({ glow, pulse, core, factory }) => {
+    const effective = getEffectiveStatus(factory);
+    let color, glowColor;
+    if (effective === 'operational') {
+      color = 'var(--fr-green)';
+      glowColor = 'rgba(0,200,83,0.3)';
+    } else if (effective === 'degraded') {
+      color = 'var(--amber)';
+      glowColor = 'rgba(240,180,41,0.3)';
+    } else {
+      color = 'var(--red-alert)';
+      glowColor = 'rgba(255,59,59,0.3)';
+    }
+    glow.setAttribute('fill', glowColor);
+    pulse.setAttribute('stroke', color);
+    core.setAttribute('fill', color);
+    core.style.filter = `drop-shadow(0 0 4px ${glowColor})`;
+  });
+}
+
+// =============================================================================
+// Region bars (static data — factory counts)
+// =============================================================================
+const regions = [
+  { name: "US WEST", count: 22 },
+  { name: "US EAST", count: 12 },
+  { name: "US SOUTH", count: 8 },
+  { name: "US CENTRAL", count: 5 },
+  { name: "OCEANIA", count: 2 },
+  { name: "EUROPE", count: 1 },
+];
+const maxCount = Math.max(...regions.map(r => r.count));
+const regionBars = document.getElementById('region-bars');
+regions.forEach(r => {
+  const pct = (r.count / maxCount * 100).toFixed(0);
+  regionBars.innerHTML += `
+    <div class="region-bar">
+      <span class="label">${r.name}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <span class="count">${r.count}</span>
+    </div>
+  `;
+});
+
+// =============================================================================
+// Sparkline (simulated 30-day uptime — stays hardcoded per plan)
+// =============================================================================
+const sparkData = [];
+for (let i = 0; i < 30; i++) {
+  sparkData.push(99.5 + Math.random() * 0.5);
+}
+const sparkW = 200, sparkH = 50;
+const sparkMin = 99.4, sparkMax = 100.1;
+const sparkPoints = sparkData.map((v, i) => {
+  const x = (i / (sparkData.length - 1)) * sparkW;
+  const y = sparkH - ((v - sparkMin) / (sparkMax - sparkMin)) * sparkH;
+  return `${x},${y}`;
+}).join(' ');
+document.getElementById('spark-line').setAttribute('points', sparkPoints);
+document.getElementById('spark-area').setAttribute('points', `0,${sparkH} ${sparkPoints} ${sparkW},${sparkH}`);
+
+// =============================================================================
+// Apply uptime gauge based on FR status page overall indicator
+// =============================================================================
+function applyUptimeGauge() {
+  const frData = sourceData.firstresonance;
+  const gaugeText = document.querySelector('.gauge-text');
+  const gaugeFill = document.querySelector('.gauge-fill');
+
+  if (!frData) return;
+
+  const indicator = frData.status ? frData.status.indicator : 'none';
+
+  if (indicator === 'none') {
+    // Operational — keep 99.9%
+    gaugeText.innerHTML = '99.9%<br><small>UPTIME</small>';
+    gaugeFill.style.stroke = 'var(--fr-green)';
+    gaugeFill.style.strokeDashoffset = '3.14'; // ~99% fill
+  } else if (indicator === 'minor') {
+    gaugeText.innerHTML = '~99%<br><small style="color:var(--amber)">DEGRADED</small>';
+    gaugeFill.style.stroke = 'var(--amber)';
+    gaugeFill.style.strokeDashoffset = '15';
+  } else {
+    gaugeText.innerHTML = 'DOWN<br><small style="color:var(--red-alert)">OUTAGE</small>';
+    gaugeFill.style.stroke = 'var(--red-alert)';
+    gaugeFill.style.strokeDashoffset = '100';
+  }
+
+  // Update the bottom strip uptime stat
+  const uptimeStat = document.querySelector('.strip-stat:nth-child(4) .num');
+  if (uptimeStat) {
+    if (indicator === 'none') uptimeStat.textContent = '99.9%';
+    else if (indicator === 'minor') { uptimeStat.textContent = '~99%'; uptimeStat.style.color = 'var(--amber)'; }
+    else { uptimeStat.textContent = 'DOWN'; uptimeStat.style.color = 'var(--red-alert)'; }
+  }
+}
+
+// =============================================================================
+// Apply Activity Feed (live incidents from all sources)
+// =============================================================================
+function applyActivityFeed() {
+  const feedEl = document.getElementById('activity-feed');
+  const liveIncidents = [];
+
+  Object.entries(sourceData).forEach(([sourceKey, data]) => {
+    if (!data || !data.incidents) return;
+    data.incidents.forEach(inc => {
+      liveIncidents.push({
+        time: new Date(inc.created_at),
+        status: inc.status,
+        name: inc.name,
+        source: SOURCE_LABELS[sourceKey] || sourceKey,
+        impact: inc.impact,
+      });
+    });
+  });
+
+  // Sort by time descending
+  liveIncidents.sort((a, b) => b.time - a.time);
+
+  // If no live incidents, keep a "No active incidents" message
+  if (liveIncidents.length === 0) {
+    feedEl.innerHTML = `
+      <div class="feed-item">
+        <span class="feed-time">—</span>
+        <div class="feed-dot" style="background:var(--fr-green)"></div>
+        <span class="feed-text" style="color:var(--text-muted)">No active incidents across all dependencies</span>
+      </div>
+    `;
+    return;
+  }
+
+  feedEl.innerHTML = '';
+  liveIncidents.slice(0, 20).forEach(inc => {
+    const timeStr = inc.time.toISOString().slice(11, 16);
+    const isOngoing = inc.status !== 'resolved' && inc.status !== 'postmortem';
+    const dotColor = isOngoing ? 'var(--amber)' : 'var(--fr-green)';
+    const statusTag = isOngoing ? ` (${inc.status})` : '';
+
+    feedEl.innerHTML += `
+      <div class="feed-item">
+        <span class="feed-time">${timeStr}</span>
+        <div class="feed-dot" style="background:${dotColor}"></div>
+        <span class="feed-text"><span class="highlight">${inc.source}</span>: ${inc.name}${statusTag}</span>
+      </div>
+    `;
+  });
+}
+
+// =============================================================================
+// Initialize & Poll
+// =============================================================================
+loadAllSources();
+setInterval(loadAllSources, 60000);
+
+// Auto-scroll feed
+setInterval(() => {
+  const feedEl = document.getElementById('activity-feed');
+  if (feedEl.scrollTop < feedEl.scrollHeight - feedEl.clientHeight) {
+    feedEl.scrollTop += 1;
+  } else {
+    feedEl.scrollTop = 0;
+  }
+}, 100);
+</script>
+</body>
+</html>
